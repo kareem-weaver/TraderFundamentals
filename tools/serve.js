@@ -3,9 +3,11 @@
 // ES modules will not load over file://, so run `npm start` and open the URL.
 import { createServer } from 'node:http';
 import { readFile, stat } from 'node:fs/promises';
-import { extname, join, normalize, resolve } from 'node:path';
+import { extname, join, normalize, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const root = resolve(import.meta.dirname, '..');
+// fileURLToPath rather than import.meta.dirname, which needs Node 20.11+.
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const port = Number(process.env.PORT) || 8080;
 
 const TYPES = {

@@ -4,8 +4,8 @@
 // api.github.com. A fine-grained token with the single "Gists" permission is
 // all this needs - never give it repo access.
 
-const SETTINGS_KEY = 'trillium.github.v1';
-const FILENAME = 'trillium-history.json';
+const SETTINGS_KEY = 'traderfundamentals.github.v1';
+const FILENAME = 'traderfundamentals-history.json';
 const API = 'https://api.github.com';
 
 export function loadSync() {
@@ -70,7 +70,7 @@ export async function push(backupJson) {
     : await call('/gists', {
         token,
         method: 'POST',
-        body: { description: 'Trillium typing history', public: false, files }
+        body: { description: 'TraderFundamentals typing history', public: false, files }
       });
 
   saveSync({ gistId: gist.id, lastSyncedAt: Date.now() });

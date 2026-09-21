@@ -36,5 +36,5 @@ createServer(async (req, res) => {
     res.writeHead(404, { 'content-type': 'text/plain' }).end('Not found');
   }
 }).listen(port, () => {
-  console.log(`Trillium running at http://localhost:${port}`);
+  console.log(`TraderFundamentals running at http://localhost:${port}`);
 });

@@ -1,7 +1,7 @@
 // localStorage persistence. Everything is namespaced and version-stamped so the
 // shape can change later without stranding someone's history.
 
-const KEY = 'trillium.v1';
+const KEY = 'traderfundamentals.v1';
 const MAX_SESSIONS = 300;
 
 const EMPTY = {
@@ -98,7 +98,7 @@ export const store = {
   import(payload, { merge = true } = {}) {
     const incoming = typeof payload === 'string' ? JSON.parse(payload) : payload;
     if (!incoming || !Array.isArray(incoming.sessions)) {
-      throw new Error('That file does not look like a Trillium backup.');
+      throw new Error('That file does not look like a TraderFundamentals backup.');
     }
     const current = read();
     const sessions = merge ? mergeSessions(current.sessions, incoming.sessions) : incoming.sessions;

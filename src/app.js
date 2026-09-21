@@ -514,7 +514,7 @@ function wire() {
       ?? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
     const next = current === 'dark' ? 'light' : 'dark';
     document.documentElement.dataset.theme = next;
-    localStorage.setItem('trillium.theme', next);
+    localStorage.setItem('traderfundamentals.theme', next);
     if (state.view === 'progress') renderProgress();
   });
 
@@ -627,7 +627,7 @@ function wire() {
     const blob = new Blob([store.export()], { type: 'application/json' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `trillium-history-${new Date().toISOString().slice(0, 10)}.json`;
+    link.download = `traderfundamentals-history-${new Date().toISOString().slice(0, 10)}.json`;
     link.click();
     URL.revokeObjectURL(link.href);
   });
@@ -671,7 +671,7 @@ function wire() {
 /* ── Boot ───────────────────────────────────────────────────────────────── */
 
 function boot() {
-  const savedTheme = localStorage.getItem('trillium.theme');
+  const savedTheme = localStorage.getItem('traderfundamentals.theme');
   if (savedTheme) document.documentElement.dataset.theme = savedTheme;
 
   const saved = state.settings.tickerText;

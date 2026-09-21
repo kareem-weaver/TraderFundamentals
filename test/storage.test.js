@@ -81,7 +81,7 @@ test('import rejects a file that is not a backup', () => {
 });
 
 test('corrupt storage falls back to defaults instead of throwing', () => {
-  localStorage.setItem('trillium.v1', '{{{not json');
+  localStorage.setItem('traderfundamentals.v1', '{{{not json');
   assert.deepEqual(store.sessions(), []);
   assert.equal(store.settings().mode, 'ticker');
 });

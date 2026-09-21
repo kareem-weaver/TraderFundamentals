@@ -1,4 +1,4 @@
-# Trillium
+# TraderFundamentals
 
 A typing trainer for ticker symbols — and for saying them out loud. A symbol
 appears, you type it, you press <kbd>Enter</kbd>, the next one appears. It times
@@ -73,7 +73,7 @@ npm test
 `.github/workflows/pages.yml` publishes the default branch to Pages on every push
 to it. Turn it on once, at **Settings → Pages → Build and deployment →
 Source: GitHub Actions**.
-The app then lives at `https://<user>.github.io/Trillium/`.
+The app then lives at `https://<user>.github.io/TraderFundamentals/`.
 
 `.github/workflows/ci.yml` runs the test suite on pushes and pull requests.
 

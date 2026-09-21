@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Trillium</title>
+<meta name="description" content="Ticker typing trainer with NATO phonetic drills, timing and progress history." />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><text y='13' font-size='13'>⌨</text></svg>" />
+<link rel="stylesheet" href="assets/styles.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true">◆</span>
+    <h1>Trillium</h1>
+    <span class="brand-sub">ticker &amp; phonetic typing trainer</span>
+  </div>
+  <nav class="tabs" role="tablist">
+    <button class="tab is-active" role="tab" data-view="test" aria-selected="true">Test</button>
+    <button class="tab" role="tab" data-view="progress" aria-selected="false">Progress</button>
+    <button class="tab" role="tab" data-view="setup" aria-selected="false">Setup</button>
+  </nav>
+  <button class="icon-button" id="theme-toggle" title="Toggle light/dark" aria-label="Toggle light and dark theme">◑</button>
+</header>
+
+<main>
+  <!-- ── Test ──────────────────────────────────────────────────────────── -->
+  <section class="view is-active" id="view-test" role="tabpanel">
+    <div class="run-bar">
+      <div class="run-meta">
+        <span id="run-list">Index ETFs</span>
+        <span class="dot">·</span>
+        <span id="run-mode">Ticker</span>
+      </div>
+      <div class="run-progress">
+        <span id="run-counter">0 / 20</span>
+        <div class="progress-track"><div class="progress-fill" id="run-progress-fill"></div></div>
+      </div>
+      <div class="run-live">
+        <span class="live-stat"><b id="live-timer">0.0s</b><small>elapsed</small></span>
+        <span class="live-stat"><b id="live-accuracy">100%</b><small>accuracy</small></span>
+        <span class="live-stat"><b id="live-wpm">0</b><small>wpm</small></span>
+      </div>
+    </div>
+
+    <div class="stage" id="stage">
+      <!-- Idle -->
+      <div class="stage-panel is-active" id="panel-idle">
+        <p class="stage-kicker">Ready</p>
+        <h2 class="stage-title">Press <kbd>Enter</kbd> to start</h2>
+        <p class="stage-note" id="idle-note">20 prompts from Index ETFs, ticker mode.</p>
+        <button class="primary" id="start-button">Start run</button>
+      </div>
+
+      <!-- Running -->
+      <div class="stage-panel" id="panel-run">
+        <p class="stage-kicker" id="prompt-kicker">Type the symbol</p>
+        <div class="prompt" id="prompt"></div>
+        <div class="answer-target" id="answer-target" aria-hidden="true"></div>
+        <label class="sr-only" for="answer">Your answer</label>
+        <input id="answer" class="answer" type="text" autocomplete="off" autocorrect="off"
+               autocapitalize="off" spellcheck="false" placeholder="type here, then Enter" />
+        <p class="stage-note">
+          <kbd>Enter</kbd> next · <kbd>Tab</kbd> skip · <kbd>Esc</kbd> end run
+        </p>
+      </div>
+
+      <!-- Results -->
+      <div class="stage-panel" id="panel-done">
+        <p class="stage-kicker">Run complete</p>
+        <div class="hero" id="result-hero">0</div>
+        <p class="hero-label">words per minute</p>
+        <div class="result-grid" id="result-grid"></div>
+        <div class="result-actions">
+          <button class="primary" id="again-button">Run again</button>
+          <button class="ghost" id="drill-button">Drill my weak symbols</button>
+          <button class="ghost" id="review-button">See progress</button>
+        </div>
+        <table class="result-table" id="result-table"></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Progress ──────────────────────────────────────────────────────── -->
+  <section class="view" id="view-progress" role="tabpanel">
+    <div class="stat-row" id="overall-stats"></div>
+
+    <div class="chart-grid">
+      <figure class="card">
+        <figcaption>
+          <h3>Speed</h3>
+          <p>Words per minute, by session <span class="delta" id="wpm-delta"></span></p>
+        </figcaption>
+        <div class="chart" id="chart-wpm"></div>
+      </figure>
+      <figure class="card">
+        <figcaption>
+          <h3>Accuracy</h3>
+          <p>Prompts correct, by session <span class="delta" id="accuracy-delta"></span></p>
+        </figcaption>
+        <div class="chart" id="chart-accuracy"></div>
+      </figure>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h3>By symbol</h3>
+          <p>Weakest first — these are what the drill button picks up.</p>
+        </div>
+        <div class="segmented" id="ticker-mode-filter" role="group" aria-label="Filter by mode">
+          <button class="is-active" data-mode="all">All</button>
+          <button data-mode="ticker">Ticker</button>
+          <button data-mode="phonetic">Phonetic</button>
+        </div>
+      </div>
+      <div class="table-scroll"><table class="data-table" id="ticker-table"></table></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h3>Session log</h3>
+          <p>Most recent first.</p>
+        </div>
+      </div>
+      <div class="table-scroll"><table class="data-table" id="session-table"></table></div>
+    </div>
+  </section>
+
+  <!-- ── Setup ─────────────────────────────────────────────────────────── -->
+  <section class="view" id="view-setup" role="tabpanel">
+    <div class="setup-grid">
+      <div class="card">
+        <h3>Symbols</h3>
+        <p class="card-note">Paste your own list — commas, spaces or newlines all work.</p>
+        <textarea id="ticker-input" class="ticker-input" rows="7" spellcheck="false"
+                  placeholder="SPY QQQ IWM, BRK.B&#10;NVDA AAPL"></textarea>
+        <p class="field-note" id="ticker-count"></p>
+        <div class="button-row">
+          <button class="ghost" id="save-list-button">Save this list</button>
+          <button class="ghost" id="clear-list-button">Clear</button>
+        </div>
+        <div class="chip-row" id="preset-row"></div>
+        <div class="chip-row" id="saved-row"></div>
+      </div>
+
+      <div class="card">
+        <h3>Mode</h3>
+        <div class="segmented wide" id="mode-picker" role="group" aria-label="Test mode">
+          <button data-mode="ticker" class="is-active">Ticker</button>
+          <button data-mode="phonetic">Phonetic</button>
+          <button data-mode="mixed">Mixed</button>
+        </div>
+        <p class="field-note" id="mode-note">Type the symbol exactly as shown.</p>
+
+        <h3 class="spaced">Run length</h3>
+        <div class="segmented wide" id="length-picker" role="group" aria-label="Run length">
+          <button data-length="10">10</button>
+          <button data-length="20" class="is-active">20</button>
+          <button data-length="50">50</button>
+          <button data-length="0">All</button>
+        </div>
+
+        <h3 class="spaced">Options</h3>
+        <label class="toggle">
+          <input type="checkbox" id="order-toggle" checked />
+          <span>Shuffle the order</span>
+        </label>
+        <label class="toggle">
+          <input type="checkbox" id="strict-toggle" />
+          <span>Strict — a wrong answer won't advance</span>
+        </label>
+      </div>
+
+      <div class="card">
+        <h3>GitHub sync</h3>
+        <p class="card-note">
+          History lives in this browser. Link a private gist to back it up and carry it
+          between machines.
+        </p>
+        <div class="sync-status" id="sync-status">Not connected.</div>
+        <label class="field">
+          <span>Personal access token</span>
+          <input type="password" id="gh-token" autocomplete="off" placeholder="github_pat_..." />
+        </label>
+        <label class="field">
+          <span>Gist ID <small>(blank creates one)</small></span>
+          <input type="text" id="gh-gist" autocomplete="off" placeholder="created on first push" />
+        </label>
+        <div class="button-row">
+          <button class="ghost" id="gh-save">Save &amp; verify</button>
+          <button class="ghost" id="gh-push">Back up ↑</button>
+          <button class="ghost" id="gh-pull">Restore ↓</button>
+          <button class="ghost danger" id="gh-forget">Forget token</button>
+        </div>
+        <p class="field-note warn">
+          Use a <b>fine-grained</b> token whose only permission is <b>Gists: read and write</b>.
+          It is stored in this browser's localStorage and sent only to api.github.com.
+          Anyone with access to this browser profile can read it.
+        </p>
+
+        <h3 class="spaced">Local backup</h3>
+        <div class="button-row">
+          <button class="ghost" id="export-button">Export JSON</button>
+          <button class="ghost" id="import-button">Import JSON</button>
+          <button class="ghost danger" id="reset-button">Erase history</button>
+        </div>
+        <input type="file" id="import-file" accept="application/json,.json" hidden />
+      </div>
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<script type="module" src="src/app.js"></script>
+</body>
+</html>

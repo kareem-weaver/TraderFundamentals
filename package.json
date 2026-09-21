@@ -1,0 +1,12 @@
+{
+  "name": "trillium",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Ticker typing trainer with NATO phonetic drilling, timing, accuracy and progress history.",
+  "type": "module",
+  "scripts": {
+    "start": "node tools/serve.js",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "license": "MIT"
+}

@@ -1,7 +1,7 @@
 // UI wiring. All scoring lives in engine.js; all aggregation in stats.js.
 
 import { MODES, Session } from './engine.js';
-import { INTENSITIES, LANES, TapeSession } from './tape.js';
+import { INTENSITIES, TAPE_ROWS, TapeSession } from './tape.js';
 import { PRESETS, parseTickers } from './tickers.js';
 import { store } from './storage.js';
 import { overallStats, progressSeries, tickerStats, trend, weakTickers } from './stats.js';
@@ -354,6 +354,7 @@ function startTape(tickers) {
   setPanel('tape');
   $('tape').querySelectorAll('.print').forEach((node) => node.remove());
   state.tapeNodes.clear();
+  $('tape-kicker').textContent = MODES[state.settings.mode]?.hint ?? 'Type the symbol';
   $('tape-answer').value = '';
   $('tape-answer').classList.remove('is-wrong');
   $('tape-answer').focus();
@@ -369,11 +370,10 @@ function tapeFrame() {
   const tape = state.tape;
   if (!tape) return;
 
-  const now = Date.now();
-  const { escaped, finished } = tape.tick(now);
+  const { escaped, finished } = tape.tick(Date.now());
   for (const row of escaped) retireNode(row, 'is-escaped');
 
-  renderTape(now);
+  renderTape();
   renderTapeStats();
 
   if (finished) {
@@ -383,46 +383,63 @@ function tapeFrame() {
   state.frame = requestAnimationFrame(tapeFrame);
 }
 
-/** Position every live print, and mark the ones the typed text can still reach. */
-function renderTape(now) {
+/** Lay the column out: row 0 at the top, each print in its own slot. */
+function renderTape() {
   const tape = state.tape;
   const board = $('tape');
-  const height = board.clientHeight;
-  const width = board.clientWidth;
+  const rowHeight = board.clientHeight / TAPE_ROWS;
   const reachable = new Set(tape.matching().map((row) => row.id));
 
-  for (const row of tape.rows) {
+  tape.rows.forEach((row, index) => {
     let node = state.tapeNodes.get(row.id);
+
     if (!node) {
       node = document.createElement('div');
-      node.className = 'print';
+      node.className = 'print is-entering';
+      node.style.height = `${rowHeight}px`;
       node.innerHTML = row.mode === 'phonetic'
-        ? `${escapeHtml(row.ticker)}<span class="print-say">say it</span>`
-        : escapeHtml(row.ticker);
+        ? `<span>${escapeHtml(row.ticker)}</span><span class="print-say">say</span>`
+        : `<span>${escapeHtml(row.ticker)}</span>`;
+      // Start one slot above the top so it slides down into place.
+      node.style.transform = `translateY(${-rowHeight}px)`;
       board.append(node);
       state.tapeNodes.set(row.id, node);
+      // Flush the starting position before animating to the real one.
+      void node.offsetHeight;
+      node.classList.remove('is-entering');
     }
 
-    const progress = Math.min(1, tape.progressOf(row, now));
-    // Lanes keep simultaneous prints from landing on top of each other.
-    const laneWidth = width / LANES;
-    const x = row.lane * laneWidth + row.jitter * Math.max(0, laneWidth - node.offsetWidth - 8) + 4;
-    const y = (height - node.offsetHeight) * (1 - progress);
-    node.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
-
+    node.style.height = `${rowHeight}px`;
+    node.style.transform = `translateY(${index * rowHeight}px)`;
+    node.classList.toggle('is-odd', index % 2 === 1);
     node.classList.toggle('is-match', reachable.has(row.id));
-    node.classList.toggle('is-urgent', progress > 0.7 && progress <= 0.88);
-    node.classList.toggle('is-critical', progress > 0.88);
-  }
+
+    // Depth only means danger once the column is full.
+    const full = tape.rows.length >= TAPE_ROWS;
+    const fromBottom = tape.rows.length - 1 - index;
+    node.classList.toggle('is-urgent', full && fromBottom < 5 && fromBottom >= 2);
+    node.classList.toggle('is-critical', full && fromBottom < 2);
+  });
 }
 
-/** Fade a print out, then drop its node. */
+/**
+ * Retire a print's node. An escaped one slides on out of the bottom so it does
+ * not sit on top of the row that takes its slot; a taken one fades in place.
+ */
 function retireNode(row, className) {
   const node = state.tapeNodes.get(row.id);
   if (!node) return;
   state.tapeNodes.delete(row.id);
+  node.classList.remove('is-match', 'is-urgent', 'is-critical');
   node.classList.add(className);
-  setTimeout(() => node.remove(), 220);
+
+  if (className === 'is-escaped') {
+    const board = $('tape');
+    const rowHeight = board.clientHeight / TAPE_ROWS;
+    const current = Number(/translateY\(([-\d.]+)px\)/.exec(node.style.transform)?.[1] ?? 0);
+    node.style.transform = `translateY(${current + rowHeight}px)`;
+  }
+  setTimeout(() => node.remove(), 200);
 }
 
 function renderTapeStats() {
@@ -439,7 +456,10 @@ function renderTapeStats() {
     ? Math.round(tape.hits / (tape.elapsedMs / 60000))
     : 0;
   $('live-escaped').textContent = tape.escaped;
-  $('tape-live').textContent = `${tape.rows.length} on the tape`;
+  $('tape-depth').textContent = `${tape.rows.length}/${TAPE_ROWS}`;
+  $('tape-live').textContent = tape.rows.length >= TAPE_ROWS
+    ? 'Column full — the bottom row goes on the next print.'
+    : `${TAPE_ROWS - tape.rows.length} rows before prints start dropping.`;
 }
 
 function handleTapeSubmit() {
@@ -478,7 +498,7 @@ function renderTapeResults(summary) {
     ['Per minute', summary.tickersPerMinute],
     ['Escaped', summary.escaped],
     ['Keystrokes', `${summary.keystrokeAccuracy}%`],
-    ['Busiest', `${summary.peakLive} at once`],
+    ['Longest run', `×${summary.longestRun}`],
     ['Run time', fmtDuration(summary.elapsedMs)]
   ];
   $('result-grid').innerHTML = cells

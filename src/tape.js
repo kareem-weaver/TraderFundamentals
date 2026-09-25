@@ -1,41 +1,45 @@
-// The prints tape: symbols surface at the bottom and rise to the top, each at
-// its own speed. Type one and press Enter to take it off the tape before it
-// escapes. Arrivals are deliberately clumpy, so the load is uneven.
+// The prints tape: a fixed-height column of the last N prints. New ones land at
+// the top and shove everything down; whatever falls off the bottom is gone.
+// Take a print by typing it before it is pushed out.
+//
+// Symbols repeat in runs the way a real tape does - usually a couple in a row,
+// occasionally enough to fill the whole column.
 //
 // DOM-free, and every source of variation is injectable, so the whole thing is
 // unit testable.
 
 import { expectedAnswer, isAnswerCorrect, isOnTrack } from './engine.js';
 
+/** Rows in the column. A print survives this many arrivals after its own. */
+export const TAPE_ROWS = 20;
+
+/** How full the column is when a run starts, so there is a tape to read. */
+const PREFILL_ROWS = 12;
+
+/** Gap between arrivals inside a burst. */
+const BURST_GAP_MS = [120, 260];
+
 /**
- * How hard the tape runs.
- * `spawnMs` is the gap between arrivals, `riseMs` how long a print takes to
- * cross the window, `burstChance` how often several land at once.
+ * How hard the tape runs. `spawnMs` is the gap between arrivals, which sets
+ * both the pressure and how long a print survives (20 rows x the gap).
  */
 export const INTENSITIES = {
   calm: {
     label: 'Calm',
-    note: 'Room to think.',
-    spawnMs: [1500, 2800], riseMs: [9000, 15000], burstChance: 0.1, burstSize: [2, 3]
+    note: 'Prints arrive with room to read them.',
+    spawnMs: [1700, 3000], burstChance: 0.1, burstSize: [2, 3], repeatChance: 0.1
   },
   normal: {
     label: 'Normal',
     note: 'Steady, with the odd flurry.',
-    spawnMs: [850, 1900], riseMs: [6000, 11000], burstChance: 0.2, burstSize: [2, 4]
+    spawnMs: [950, 1900], burstChance: 0.2, burstSize: [2, 4], repeatChance: 0.14
   },
   storm: {
     label: 'Storm',
-    note: 'You will not get them all.',
-    spawnMs: [380, 1100], riseMs: [3800, 7500], burstChance: 0.32, burstSize: [3, 6]
+    note: 'The bottom of the column will get away from you.',
+    spawnMs: [450, 1150], burstChance: 0.32, burstSize: [3, 6], repeatChance: 0.18
   }
 };
-
-export const LANES = 4;
-const MAX_LIVE = 16;
-/** A lane needs this much clear space at the bottom before it takes a print. */
-const LANE_CLEARANCE = 0.16;
-/** Gap between arrivals inside a burst. */
-const BURST_GAP_MS = [130, 280];
 
 const DEFAULTS = {
   mode: 'ticker',
@@ -58,6 +62,8 @@ export class TapeSession {
     this.now = config.now;
     this.random = config.random;
 
+    // rows[0] is the newest print, at the top. The last entry is about to fall
+    // off the bottom.
     this.rows = [];
     this.results = [];
     this.startedAt = null;
@@ -74,8 +80,11 @@ export class TapeSession {
     this.correctKeystrokes = 0;
     this.backspaces = 0;
     this.peakLive = 0;
+    this.longestRun = 0;
     this.burstRemaining = 0;
-    this.laneLastSpawn = new Array(LANES).fill(-Infinity);
+    this.repeatTicker = null;
+    this.repeatRemaining = 0;
+    this.currentRun = 0;
   }
 
   /** A number in [min, max). */
@@ -83,36 +92,40 @@ export class TapeSession {
     return min + this.random() * (max - min);
   }
 
-  #pickTicker() {
+  #randomTicker() {
     return this.tickers[Math.floor(this.random() * this.tickers.length)];
   }
 
   /**
-   * Put a new print in whichever lane has the most clear space at the bottom.
-   * Going by free space rather than by last-spawn time accounts for prints
-   * rising at different speeds.
+   * How many prints a repeat run lasts. Weighted hard toward short runs, with
+   * a thin tail that can fill the column.
    */
-  #pickLane(at) {
-    let best = 0;
-    let bestRoom = -Infinity;
-    for (let i = 0; i < LANES; i += 1) {
-      const room = this.#laneRoom(i, at);
-      // Ties go to the lane used least recently, which spreads a burst out.
-      if (room > bestRoom || (room === bestRoom && this.laneLastSpawn[i] < this.laneLastSpawn[best])) {
-        bestRoom = room;
-        best = i;
-      }
-    }
-    return best;
+  #runLength() {
+    const roll = this.random();
+    if (roll < 0.6) return 2 + Math.floor(this.random() * 2);              // 2-3
+    if (roll < 0.85) return 4 + Math.floor(this.random() * 3);             // 4-6
+    if (roll < 0.97) return 7 + Math.floor(this.random() * 6);             // 7-12
+    return 13 + Math.floor(this.random() * (TAPE_ROWS - 12));              // 13-20
   }
 
-  /** How far along the lowest print in a lane is; Infinity when the lane is clear. */
-  #laneRoom(lane, at) {
-    let room = Infinity;
-    for (const row of this.rows) {
-      if (row.lane === lane) room = Math.min(room, this.progressOf(row, at));
+  /** The next symbol to print, continuing or starting a repeat run. */
+  #nextTicker() {
+    if (this.repeatRemaining > 0) {
+      this.repeatRemaining -= 1;
+      this.currentRun += 1;
+      this.longestRun = Math.max(this.longestRun, this.currentRun);
+      return this.repeatTicker;
     }
-    return room;
+
+    const ticker = this.#randomTicker();
+    this.currentRun = 1;
+    this.longestRun = Math.max(this.longestRun, 1);
+
+    if (this.tickers.length > 1 && this.random() < this.tuning.repeatChance) {
+      this.repeatTicker = ticker;
+      this.repeatRemaining = this.#runLength() - 1;
+    }
+    return ticker;
   }
 
   get elapsedMs() {
@@ -124,40 +137,61 @@ export class TapeSession {
     return Math.max(0, this.durationMs - this.elapsedMs);
   }
 
+  /** How far down the column a print sits: 0 at the top, 1 at the bottom row. */
+  depthOf(row) {
+    const index = this.rows.indexOf(row);
+    return index < 0 ? 1 : index / (TAPE_ROWS - 1);
+  }
+
   start() {
     const at = this.now();
     this.startedAt = at;
-    // First print lands almost immediately so the window is never empty at the off.
-    this.nextSpawnAt = at + 250;
+
+    // Seed the column so it reads like a tape already running, rather than
+    // making you wait 20 arrivals before anything can be pushed out.
+    for (let i = 0; i < PREFILL_ROWS; i += 1) {
+      this.#push(at - (PREFILL_ROWS - i) * 400, { count: false });
+    }
+    this.nextSpawnAt = at + 300;
+    this.peakLive = this.rows.length;
     return this;
   }
 
-  #spawn(at) {
-    const ticker = this.#pickTicker();
+  /** Put one print at the top. Returns the row pushed off the bottom, if any. */
+  #push(at, { count = true } = {}) {
+    const ticker = this.#nextTicker();
     const mode = this.mode === 'mixed'
       ? (this.random() < 0.5 ? 'ticker' : 'phonetic')
       : this.mode;
-    const lane = this.#pickLane(at);
-    this.laneLastSpawn[lane] = at;
 
     const row = {
       id: this.nextId++,
       ticker,
       mode,
       expected: expectedAnswer(ticker, mode),
-      spawnAt: at,
-      // Phonetic answers take far longer to type, so give them more runway.
-      riseMs: this.#between(...this.tuning.riseMs) * (mode === 'phonetic' ? 1.7 : 1),
-      lane,
-      jitter: this.random()
+      spawnAt: at
     };
-    this.rows.push(row);
-    return row;
-  }
+    this.rows.unshift(row);
 
-  /** 0 at the bottom, 1 at the top, past 1 means it has escaped. */
-  progressOf(row, at = this.now()) {
-    return (at - row.spawnAt) / row.riseMs;
+    let evicted = null;
+    if (this.rows.length > TAPE_ROWS) {
+      evicted = this.rows.pop();
+      if (count) {
+        this.escaped += 1;
+        this.results.push({
+          ticker: evicted.ticker,
+          mode: evicted.mode,
+          expected: evicted.expected,
+          typed: '',
+          correct: false,
+          escaped: true,
+          ms: at - evicted.spawnAt,
+          errors: 0,
+          clean: false
+        });
+      }
+    }
+    return { row, evicted };
   }
 
   /**
@@ -171,39 +205,13 @@ export class TapeSession {
     const escaped = [];
     const overtime = this.startedAt !== null && at - this.startedAt >= this.durationMs;
 
-    // Retire anything that reached the top.
-    for (const row of [...this.rows]) {
-      if (this.progressOf(row, at) >= 1) {
-        this.rows.splice(this.rows.indexOf(row), 1);
-        this.escaped += 1;
-        this.results.push({
-          ticker: row.ticker,
-          mode: row.mode,
-          expected: row.expected,
-          typed: '',
-          correct: false,
-          escaped: true,
-          ms: row.riseMs,
-          errors: 0,
-          clean: false
-        });
-        escaped.push(row);
-      }
-    }
-
-    // Stop feeding the tape once time is up, but let what is on screen play out.
     if (!overtime) {
-      while (at >= this.nextSpawnAt && this.rows.length < MAX_LIVE) {
-        // Every lane still crowded at the bottom? Hold the print back rather
-        // than dropping it on top of one that has barely moved.
-        if (this.#laneRoom(this.#pickLane(at), at) < LANE_CLEARANCE) {
-          this.nextSpawnAt = at + 140;
-          break;
-        }
-        spawned.push(this.#spawn(at));
+      while (at >= this.nextSpawnAt) {
+        const { row, evicted } = this.#push(at);
+        spawned.push(row);
+        if (evicted) escaped.push(evicted);
 
-        // A burst is a rapid run of arrivals, not a simultaneous block - they
-        // land close together but far enough apart to read.
+        // A burst is a rapid run of arrivals rather than a simultaneous block.
         if (this.burstRemaining > 0) {
           this.burstRemaining -= 1;
           this.nextSpawnAt = at + this.#between(...BURST_GAP_MS);
@@ -221,15 +229,17 @@ export class TapeSession {
 
     this.peakLive = Math.max(this.peakLive, this.rows.length);
 
-    // The run ends when the clock is up and the window has drained.
-    if (overtime && this.rows.length === 0) {
+    // Once the clock is up the run ends; what is still on the column is not
+    // held against you.
+    if (overtime) {
       this.finished = true;
       this.endedAt = at;
+      this.rows = [];
     }
     return { spawned, escaped, finished: this.finished };
   }
 
-  /** Live rows whose answer could still become what is being typed. */
+  /** Prints whose answer could still become what is being typed. */
   matching(typed = this.typed) {
     if (typed.trim() === '') return [];
     return this.rows.filter((row) => isOnTrack(row.ticker, typed, row.mode));
@@ -237,7 +247,7 @@ export class TapeSession {
 
   /**
    * Record an input change. A keystroke counts as correct when it keeps at
-   * least one print on the tape reachable.
+   * least one print on the column reachable.
    */
   type(value) {
     const previous = this.typed;
@@ -256,27 +266,30 @@ export class TapeSession {
   }
 
   /**
-   * Commit what is typed. Takes the matching print closest to the top, since
-   * that is the one about to be lost.
+   * Commit what is typed. Takes the lowest matching print, since that is the
+   * one about to be pushed off. Everything below it rises a row.
    * @returns {{hit: boolean, row?: object}}
    */
   submit(at = this.now()) {
     const typed = this.typed;
     if (typed.trim() === '') return { hit: false, empty: true };
 
-    const candidates = this.rows
-      .filter((row) => isAnswerCorrect(row.ticker, typed, row.mode))
-      .sort((a, b) => this.progressOf(b, at) - this.progressOf(a, at));
+    let target = -1;
+    for (let i = this.rows.length - 1; i >= 0; i -= 1) {
+      if (isAnswerCorrect(this.rows[i].ticker, typed, this.rows[i].mode)) {
+        target = i;
+        break;
+      }
+    }
 
     this.typed = '';
 
-    if (candidates.length === 0) {
+    if (target === -1) {
       this.wrongSubmits += 1;
       return { hit: false, typed };
     }
 
-    const row = candidates[0];
-    this.rows.splice(this.rows.indexOf(row), 1);
+    const [row] = this.rows.splice(target, 1);
     this.hits += 1;
     this.results.push({
       ticker: row.ticker,
@@ -292,7 +305,7 @@ export class TapeSession {
     return { hit: true, row };
   }
 
-  /** Stop early. Prints still on screen are not counted against you. */
+  /** Stop early. Prints still on the column are not counted against you. */
   end(at = this.now()) {
     if (!this.finished) {
       this.finished = true;
@@ -328,6 +341,7 @@ export class TapeSession {
       escaped: this.escaped,
       wrongSubmits: this.wrongSubmits,
       peakLive: this.peakLive,
+      longestRun: this.longestRun,
       elapsedMs,
       typingMs: elapsedMs,
       wpm: minutes > 0 ? Math.round((chars / 5 / minutes) * 10) / 10 : 0,

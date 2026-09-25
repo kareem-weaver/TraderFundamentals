@@ -68,16 +68,24 @@
 
       <!-- Tape -->
       <div class="stage-panel" id="panel-tape">
-        <div class="tape" id="tape" aria-hidden="true">
-          <div class="tape-escape-line"></div>
+        <div class="tape-layout">
+          <div class="tape-deck">
+            <p class="stage-kicker" id="tape-kicker">Type the symbol</p>
+            <label class="sr-only" for="tape-answer">Type a symbol from the tape</label>
+            <input id="tape-answer" class="answer" type="text" autocomplete="off" autocorrect="off"
+                   autocapitalize="off" spellcheck="false" placeholder="type a symbol, then Enter" />
+            <p class="stage-note">
+              <kbd>Enter</kbd> take it · <kbd>Esc</kbd> end run
+            </p>
+            <p class="stage-note tape-live" id="tape-live"></p>
+          </div>
+
+          <div class="tape-col">
+            <div class="tape-head"><span>Prints</span><span id="tape-depth">0/20</span></div>
+            <div class="tape" id="tape" aria-hidden="true"></div>
+            <div class="tape-foot">pushed out</div>
+          </div>
         </div>
-        <label class="sr-only" for="tape-answer">Type a symbol from the tape</label>
-        <input id="tape-answer" class="answer" type="text" autocomplete="off" autocorrect="off"
-               autocapitalize="off" spellcheck="false" placeholder="type a symbol, then Enter" />
-        <p class="stage-note">
-          <kbd>Enter</kbd> take it · <kbd>Esc</kbd> end run
-          <span class="tape-live" id="tape-live"></span>
-        </p>
       </div>
 
       <!-- Results -->

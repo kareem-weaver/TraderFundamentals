@@ -488,3 +488,26 @@ main { max-width: 1060px; margin: 0 auto; padding: 24px 16px 64px; }
   .tape { height: clamp(300px, 46vh, 420px); }
   .print { font-size: 12.5px; }
 }
+
+/* ── Leaderboard ────────────────────────────────────────────────────────── */
+.board-select {
+  padding: 8px 10px;
+  border-radius: 9px;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--text-primary);
+  background: var(--surface-0);
+  border: 1px solid var(--border-strong);
+  max-width: 260px;
+}
+.board-select:focus { outline: none; border-color: var(--series-1); }
+
+.data-table tr.is-me td { background: color-mix(in srgb, var(--series-1) 12%, transparent); }
+.data-table td.rank { font-variant-numeric: tabular-nums; color: var(--text-muted); width: 44px; }
+.data-table tr.is-me td.rank { color: var(--series-1); font-weight: 600; }
+.board-medal { font-size: 12px; }
+code {
+  font-family: var(--mono); font-size: 0.9em;
+  padding: 1px 5px; border-radius: 4px;
+  background: var(--surface-2); border: 1px solid var(--border);
+}

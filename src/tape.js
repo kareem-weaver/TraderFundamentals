@@ -354,6 +354,9 @@ export class TapeSession {
       endedAt: this.endedAt ?? this.now(),
       mode: this.mode,
       listName: this.listName,
+      // The configured length, not the elapsed time: it is what defines the
+      // contest, so the leaderboard buckets on it even for a run ended early.
+      durationMs: this.durationMs,
       prompts: resolved,
       correct: this.hits,
       escaped: this.escaped,

@@ -115,6 +115,44 @@ The app then lives at `https://<user>.github.io/TraderFundamentals/`.
 
 `.github/workflows/ci.yml` runs the test suite on pushes and pull requests.
 
+## Leaderboard
+
+Optional, and off until you set it up. Scores go to a [Supabase](https://supabase.com)
+project you own, on the free tier.
+
+**Once, by whoever owns the project:**
+
+1. Create a Supabase project.
+2. Open the SQL editor and run [`supabase/schema.sql`](supabase/schema.sql).
+3. From **Project Settings → API**, copy the **Project URL** and the **anon
+   public** key. That key is meant to ship in client code; row-level security is
+   what protects the table.
+
+**Then, by everyone including you**, on the Board tab: paste the URL and anon
+key, pick a display name, and type the same **group passphrase**. The passphrase
+never leaves the browser — what gets stored and sent is its SHA-256 digest, so
+two groups with different passphrases cannot see each other's boards.
+
+Runs post automatically when you finish one; turn that off on the Board tab if
+you would rather not. Only runs on **identical settings** are ranked against
+each other — style, mode, intensity and run length all have to match, because a
+1-minute calm tape is not the same contest as 5-minute storm. Tape runs rank on
+prints banked; one-at-a-time runs rank on WPM. Each person's best run counts,
+ties broken on accuracy and then on who got there first.
+
+### What this is not
+
+There is no login, so the passphrase separates groups rather than securing them:
+
+- Anyone holding the anon key can read the whole table.
+- Scoring runs in the browser, so a determined visitor could post a score they
+  did not earn. The insert policy rejects blank names and impossible numbers,
+  and that is the extent of it.
+- Nothing can be edited or deleted through the anon key — there is no update or
+  delete policy.
+
+Good for a desk of people who trust each other. Not something to bet on.
+
 ## Syncing history to GitHub
 
 History lives in this browser's `localStorage`, so by default it does not follow
@@ -146,7 +184,9 @@ src/stats.js        history rollups, weak-symbol picking, streaks
 src/storage.js      localStorage, export/import, merge
 src/chart.js        inline-SVG progress charts
 src/github.js       optional gist sync
+src/leaderboard.js  optional shared leaderboard over Supabase's REST API
 src/app.js          UI wiring
+supabase/schema.sql the leaderboard table, its indexes and its RLS policies
 test/               node:test suites for everything above
 ```
 

@@ -364,10 +364,25 @@ test('summary shape matches what the history views expect', () => {
   const summary = tape.end(c.now());
 
   for (const key of ['id', 'startedAt', 'endedAt', 'mode', 'listName', 'prompts',
-    'correct', 'elapsedMs', 'wpm', 'promptAccuracy', 'avgMs', 'results']) {
+    'correct', 'elapsedMs', 'wpm', 'promptAccuracy', 'avgMs', 'results',
+    'durationMs', 'intensity', 'style']) {
     assert.ok(summary[key] !== undefined, `missing ${key}`);
   }
   assert.ok(Array.isArray(summary.results));
+});
+
+test('the summary reports the settings the run was configured with', () => {
+  const c = clock();
+  const tape = new TapeSession(['SPY'], {
+    now: c.now, random: plain, durationMs: 60_000, intensity: 'storm', mode: 'phonetic'
+  }).start();
+  c.advance(1000);
+  const summary = tape.end(c.now());
+  // Ended after 1s, but the contest was a 60s storm run - that is what ranks.
+  assert.equal(summary.durationMs, 60_000);
+  assert.equal(summary.intensity, 'storm');
+  assert.equal(summary.mode, 'phonetic');
+  assert.equal(summary.style, 'tape');
 });
 
 test('an empty symbol list finishes immediately', () => {

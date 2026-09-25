@@ -18,6 +18,7 @@
   <nav class="tabs" role="tablist">
     <button class="tab is-active" role="tab" data-view="test" aria-selected="true">Test</button>
     <button class="tab" role="tab" data-view="progress" aria-selected="false">Progress</button>
+    <button class="tab" role="tab" data-view="board" aria-selected="false">Board</button>
     <button class="tab" role="tab" data-view="setup" aria-selected="false">Setup</button>
   </nav>
   <button class="icon-button" id="theme-toggle" title="Toggle light/dark" aria-label="Toggle light and dark theme">◑</button>
@@ -148,6 +149,73 @@
         </div>
       </div>
       <div class="table-scroll"><table class="data-table" id="session-table"></table></div>
+    </div>
+  </section>
+
+  <!-- ── Board ─────────────────────────────────────────────────────────── -->
+  <section class="view" id="view-board" role="tabpanel">
+    <div class="card" id="board-join">
+      <div class="card-head">
+        <div>
+          <h3>Leaderboard</h3>
+          <p>Shared with anyone who joins the same group. Set this up once per browser.</p>
+        </div>
+        <span class="tag" id="board-state">Not joined</span>
+      </div>
+
+      <div class="setup-grid">
+        <div>
+          <label class="field">
+            <span>Your name on the board</span>
+            <input type="text" id="board-name" maxlength="24" autocomplete="off" placeholder="Kareem" />
+          </label>
+          <label class="field">
+            <span>Group passphrase <small>(everyone types the same one)</small></span>
+            <input type="password" id="board-pass" autocomplete="off" placeholder="desk-2026" />
+          </label>
+          <label class="toggle">
+            <input type="checkbox" id="board-auto" checked />
+            <span>Post my runs automatically</span>
+          </label>
+        </div>
+
+        <div>
+          <label class="field">
+            <span>Supabase project URL</span>
+            <input type="text" id="board-url" autocomplete="off" placeholder="https://xxxx.supabase.co" />
+          </label>
+          <label class="field">
+            <span>Supabase anon key <small>(safe to share with your group)</small></span>
+            <input type="password" id="board-key" autocomplete="off" placeholder="eyJ..." />
+          </label>
+          <div class="button-row">
+            <button class="ghost" id="board-save">Join group</button>
+            <button class="ghost danger" id="board-leave">Leave</button>
+          </div>
+        </div>
+      </div>
+
+      <p class="field-note warn">
+        No login, so this separates groups rather than securing them. Anyone with the
+        anon key can read the table, and because scoring runs in the browser a
+        determined visitor could post a score they did not earn. Fine among people who
+        trust each other; not a contest to bet on. Run
+        <code>supabase/schema.sql</code> in the Supabase SQL editor first.
+      </p>
+    </div>
+
+    <div class="card" id="board-panel" hidden>
+      <div class="card-head">
+        <div>
+          <h3 id="board-title">Standings</h3>
+          <p id="board-sub">Best run per person. Only runs on identical settings are ranked together.</p>
+        </div>
+        <div class="button-row" style="margin-top:0">
+          <select class="board-select" id="board-bucket" aria-label="Which board"></select>
+          <button class="ghost" id="board-refresh">Refresh</button>
+        </div>
+      </div>
+      <div class="table-scroll"><table class="data-table" id="board-table"></table></div>
     </div>
   </section>
 

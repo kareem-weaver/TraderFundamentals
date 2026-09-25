@@ -7,6 +7,7 @@ import { store } from './storage.js';
 import { overallStats, progressSeries, tickerStats, trend, weakTickers } from './stats.js';
 import { renderLineChart } from './chart.js';
 import * as gh from './github.js';
+import * as board from './leaderboard.js';
 
 const $ = (id) => document.getElementById(id);
 const on = (node, event, handler) => node.addEventListener(event, handler);
@@ -67,6 +68,7 @@ function setView(view) {
     section.classList.toggle('is-active', section.id === `view-${view}`);
   }
   if (view === 'progress') renderProgress();
+  if (view === 'board') renderBoard();
   if (view === 'test') {
     if (state.tape && !state.tape.finished) $('tape-answer').focus();
     else if (state.session && !state.session.finished) $('answer').focus();
@@ -322,7 +324,10 @@ function finishRun() {
   clearInterval(state.timer);
   const session = state.session;
   const summary = session.finished ? session.summary() : session.end();
-  if (summary.prompts > 0) store.addSession(summary);
+  if (summary.prompts > 0) {
+    store.addSession(summary);
+    postToBoard(summary);
+  }
 
   // The last answer never re-renders the prompt, so settle the run bar here.
   $('run-counter').textContent = `${summary.prompts} / ${session.total}`;
@@ -492,7 +497,10 @@ function handleTapeSubmit() {
 function finishTape() {
   stopTape();
   const summary = state.tape.finished ? state.tape.summary() : state.tape.end();
-  if (summary.prompts > 0) store.addSession(summary);
+  if (summary.prompts > 0) {
+    store.addSession(summary);
+    postToBoard(summary);
+  }
   renderTapeResults(summary);
   setPanel('done');
   state.tape = null;
@@ -666,6 +674,143 @@ function renderSessionTable(sessions) {
   table.innerHTML = `
     <thead><tr><th>When</th><th>Mode</th><th>List</th><th>Correct</th><th>Wpm</th><th>Accuracy</th><th>Time</th></tr></thead>
     <tbody>${body}</tbody>`;
+}
+
+/* ── Leaderboard ────────────────────────────────────────────────────────── */
+
+/** Fire-and-forget: a failed post must never interrupt the results screen. */
+async function postToBoard(summary) {
+  if (!board.isConfigured() || !board.loadBoard().autoPost) return;
+  try {
+    await board.post(summary);
+    toast('Posted to the leaderboard');
+  } catch (error) {
+    toast(`Leaderboard: ${error.message}`, true);
+  }
+}
+
+function boardSettingsToUI() {
+  const settings = board.loadBoard();
+  $('board-name').value = settings.name;
+  $('board-url').value = settings.url;
+  $('board-key').value = settings.key;
+  $('board-auto').checked = settings.autoPost !== false;
+  $('board-state').textContent = board.isConfigured() ? `Joined as ${settings.name}` : 'Not joined';
+  $('board-panel').hidden = !board.isConfigured();
+}
+
+/** The bucket matching the settings currently selected, so the default is relevant. */
+function currentBucket() {
+  const { style = 'tape', mode = 'ticker', intensity = 'normal', durationMs = 120000, length = 20 } =
+    state.settings;
+  return style === 'tape'
+    ? ['tape', mode, intensity, durationMs].join('|')
+    : ['single', mode, 'na', length].join('|');
+}
+
+async function renderBoard() {
+  boardSettingsToUI();
+  if (!board.isConfigured()) return;
+
+  const select = $('board-bucket');
+  try {
+    const found = await board.buckets();
+    const mine = currentBucket();
+    const options = [...new Set([mine, ...found])];
+    const keep = select.value;
+    select.innerHTML = options
+      .map((b) => `<option value="${escapeHtml(b)}">${escapeHtml(board.bucketLabel(b))}</option>`)
+      .join('');
+    select.value = options.includes(keep) ? keep : mine;
+  } catch (error) {
+    $('board-table').innerHTML =
+      `<tbody><tr><td class="empty">${escapeHtml(error.message)}</td></tr></tbody>`;
+    return;
+  }
+  await renderStandings();
+}
+
+async function renderStandings() {
+  const table = $('board-table');
+  const bucket = $('board-bucket').value;
+  if (!bucket) return;
+
+  table.innerHTML = '<tbody><tr><td class="empty">Loading…</td></tr></tbody>';
+  $('board-sub').textContent = board.bucketLabel(bucket);
+
+  let rows;
+  try {
+    rows = await board.top(bucket);
+  } catch (error) {
+    table.innerHTML = `<tbody><tr><td class="empty">${escapeHtml(error.message)}</td></tr></tbody>`;
+    return;
+  }
+
+  if (rows.length === 0) {
+    table.innerHTML =
+      '<tbody><tr><td class="empty">No runs on these settings yet. Go and set the pace.</td></tr></tbody>';
+    return;
+  }
+
+  const me = board.loadBoard().name.trim().toLowerCase();
+  const isTape = bucket.startsWith('tape');
+  const medals = ['🥇', '🥈', '🥉'];
+
+  const body = rows.map((row) => `
+    <tr class="${row.name.toLowerCase() === me ? 'is-me' : ''}">
+      <td class="rank">${row.rank <= 3 ? `<span class="board-medal">${medals[row.rank - 1]}</span>` : row.rank}</td>
+      <td>${escapeHtml(row.name)}</td>
+      <td class="num"><b>${row.score}</b></td>
+      <td class="num">${Math.round(row.accuracy)}%</td>
+      <td class="num">${isTape ? row.escaped : Math.round(row.taken)}</td>
+      <td class="num">${isTape ? `×${row.longest_run}` : '—'}</td>
+      <td>${fmtDate(row.created_at)}</td>
+    </tr>`).join('');
+
+  table.innerHTML = `
+    <thead><tr>
+      <th></th><th>Name</th>
+      <th>${isTape ? 'Banked' : 'Wpm'}</th>
+      <th>Accuracy</th>
+      <th>${isTape ? 'Escaped' : 'Correct'}</th>
+      <th>${isTape ? 'Longest run' : ''}</th>
+      <th>When</th>
+    </tr></thead>
+    <tbody>${body}</tbody>`;
+}
+
+function wireBoard() {
+  boardSettingsToUI();
+
+  on($('board-save'), 'click', () => withBusy($('board-save'), 'Joining…', async () => {
+    const name = $('board-name').value.trim();
+    const pass = $('board-pass').value.trim();
+    if (!name) throw new Error('Pick a name to show on the board.');
+    if (!pass) throw new Error('Enter the group passphrase.');
+
+    board.saveBoard({
+      name,
+      url: $('board-url').value.trim(),
+      key: $('board-key').value.trim(),
+      board: await board.boardIdFor(pass),
+      autoPost: $('board-auto').checked
+    });
+    await board.verify();
+    $('board-pass').value = '';
+    toast(`Joined the board as ${name}`);
+    await renderBoard();
+  }));
+
+  on($('board-leave'), 'click', () => {
+    board.clearBoard();
+    $('board-pass').value = '';
+    boardSettingsToUI();
+    toast('Left the leaderboard on this browser');
+  });
+
+  on($('board-auto'), 'change', (event) => board.saveBoard({ autoPost: event.target.checked }));
+  on($('board-bucket'), 'change', renderStandings);
+  on($('board-refresh'), 'click', renderStandings);
 }
 
 /* ── GitHub sync ────────────────────────────────────────────────────────── */
@@ -942,6 +1087,7 @@ function wire() {
   });
 
   wireGithub();
+  wireBoard();
 }
 
 /* ── Boot ───────────────────────────────────────────────────────────────── */

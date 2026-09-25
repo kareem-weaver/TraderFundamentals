@@ -55,15 +55,15 @@ test('a print pushed off the bottom escapes and counts against you', () => {
   // Fill the remaining rows; nothing should escape yet.
   while (tape.rows.length < TAPE_ROWS) {
     c.advance(2000);
-    assert.equal(tape.tick(c.now()).escaped.length, 0, 'nothing escapes while there is room');
+    assert.equal(tape.tick(c.now()).dropped.length, 0, 'nothing drops while there is room');
   }
   assert.equal(tape.rows.length, TAPE_ROWS);
   const bottom = tape.rows[TAPE_ROWS - 1];
 
   c.advance(2000);
-  const { escaped } = tape.tick(c.now());
-  assert.equal(escaped.length, 1);
-  assert.equal(escaped[0].id, bottom.id, 'the bottom row is the one that goes');
+  const { dropped } = tape.tick(c.now());
+  assert.equal(dropped.length, 1);
+  assert.equal(dropped[0].id, bottom.id, 'the bottom row is the one that goes');
   assert.equal(tape.escaped, 1);
   assert.equal(tape.results[0].correct, false);
   assert.equal(tape.results[0].escaped, true);
@@ -82,40 +82,120 @@ test('depth runs 0 at the top to 1 at the bottom row', () => {
   assert.equal(tape.depthOf(tape.rows[TAPE_ROWS - 1]), 1);
 });
 
-test('typing a print on the column takes it off', () => {
+test('taking a print scores it but leaves it on the column', () => {
   const c = clock();
   const tape = new TapeSession(['SPY'], { now: c.now, random: plain }).start();
   const before = tape.rows.length;
   tape.type('SPY');
   const outcome = tape.submit(c.now());
+
   assert.equal(outcome.hit, true);
-  assert.equal(tape.rows.length, before - 1);
+  assert.equal(tape.rows.length, before, 'the tape does not shrink because you read it');
+  assert.ok(tape.rows.includes(outcome.row), 'it is still there');
+  assert.equal(outcome.row.taken, true, 'just marked');
   assert.equal(tape.hits, 1);
   assert.equal(tape.results[0].correct, true);
 });
 
-test('taking a print lets everything below it rise a row', () => {
+test('a print already taken cannot be scored again', () => {
   const c = clock();
-  const tape = new TapeSession(['SPY', 'QQQ'], { now: c.now, random: mid }).start();
-  const bottom = tape.rows[tape.rows.length - 1];
-  const above = tape.rows[tape.rows.length - 2];
+  const tape = new TapeSession(['SPY'], { now: c.now, random: plain }).start();
+  const copies = tape.rows.length;
 
-  tape.type(bottom.ticker);
-  const outcome = tape.submit(c.now());
-  assert.equal(outcome.hit, true);
-  assert.equal(outcome.row.id, bottom.id);
-  assert.equal(tape.rows[tape.rows.length - 1].id, above.id, 'the one above is now last');
+  // Every row is SPY, so it can be taken exactly once per row and no more.
+  for (let i = 0; i < copies; i += 1) {
+    tape.type('SPY');
+    assert.equal(tape.submit(c.now()).hit, true, `copy ${i + 1} should be takeable`);
+  }
+  tape.type('SPY');
+  assert.equal(tape.submit(c.now()).hit, false, 'nothing left untaken');
+  assert.equal(tape.hits, copies);
+  assert.equal(tape.wrongSubmits, 1);
 });
 
-test('with the symbol repeated, the lowest copy is taken first', () => {
+test('a taken print is not offered as a match again', () => {
+  const tape = new TapeSession(['SPY'], { random: plain }).start();
+  const before = tape.matching('SPY').length;
+  tape.type('SPY');
+  tape.submit();
+  assert.equal(tape.matching('SPY').length, before - 1);
+});
+
+test('a taken print dropping off the bottom is not an escape', () => {
+  const c = clock();
+  const tape = new TapeSession(['SPY'], {
+    now: c.now, random: plain, durationMs: 10 * 60_000
+  }).start();
+
+  // Take every print currently on the column.
+  const taken = tape.rows.length;
+  for (let i = 0; i < taken; i += 1) {
+    tape.type('SPY');
+    tape.submit(c.now());
+  }
+  assert.equal(tape.hits, taken);
+
+  // Push all of them off the bottom.
+  while (tape.rows.some((r) => r.taken)) {
+    c.advance(2000);
+    tape.tick(c.now());
+  }
+  assert.equal(tape.escaped, 0, 'banked prints leave without penalty');
+  assert.equal(tape.results.filter((r) => r.escaped).length, 0);
+});
+
+test('an untaken print dropping off the bottom still escapes', () => {
+  const c = clock();
+  const tape = new TapeSession(['SPY'], {
+    now: c.now, random: plain, durationMs: 10 * 60_000
+  }).start();
+  while (tape.escaped === 0) {
+    c.advance(2000);
+    tape.tick(c.now());
+  }
+  assert.ok(tape.escaped >= 1);
+});
+
+test('every print carries a direction', () => {
+  const tape = new TapeSession(['SPY'], { random: mid }).start();
+  assert.ok(tape.rows.length > 0);
+  for (const row of tape.rows) {
+    assert.ok(row.direction === 'up' || row.direction === 'down', `bad direction ${row.direction}`);
+    assert.equal(row.taken, false, 'nothing starts taken');
+  }
+});
+
+test('direction is split rather than fixed', () => {
+  const c = clock();
+  let seed = 99;
+  const rng = () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const tape = new TapeSession(['SPY', 'QQQ'], {
+    now: c.now, random: rng, durationMs: 60 * 60_000
+  }).start();
+  for (let i = 0; i < 200; i += 1) {
+    c.advance(2000);
+    tape.tick(c.now());
+  }
+  const ups = tape.rows.filter((r) => r.direction === 'up').length;
+  assert.ok(ups > 0 && ups < tape.rows.length, `all one way: ${ups}/${tape.rows.length}`);
+});
+
+test('with the symbol repeated, the lowest untaken copy goes first', () => {
   const c = clock();
   const tape = new TapeSession(['SPY'], { now: c.now, random: plain }).start();
   const lowest = tape.rows[tape.rows.length - 1];
+  const nextUp = tape.rows[tape.rows.length - 2];
   assert.ok(tape.rows.length > 2);
 
   tape.type('SPY');
-  const outcome = tape.submit(c.now());
-  assert.equal(outcome.row.id, lowest.id, 'the copy closest to falling off goes first');
+  assert.equal(tape.submit(c.now()).row.id, lowest.id, 'closest to falling off first');
+  tape.type('SPY');
+  assert.equal(tape.submit(c.now()).row.id, nextUp.id, 'then the one above it');
 });
 
 test('submitting something not on the column is a wrong submit', () => {
@@ -319,4 +399,5 @@ test('every intensity is fully specified', () => {
     assert.ok(tuning.repeatChance > 0 && tuning.repeatChance < 1);
   }
   assert.ok(INTENSITIES.storm.spawnMs[0] < INTENSITIES.calm.spawnMs[0], 'storm is busier');
+  assert.ok(INTENSITIES.normal.spawnMs[1] <= 1200, 'the tape moves quickly now');
 });

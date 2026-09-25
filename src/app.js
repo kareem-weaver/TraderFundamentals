@@ -370,8 +370,8 @@ function tapeFrame() {
   const tape = state.tape;
   if (!tape) return;
 
-  const { escaped, finished } = tape.tick(Date.now());
-  for (const row of escaped) retireNode(row, 'is-escaped');
+  const { dropped, finished } = tape.tick(Date.now());
+  for (const row of dropped) retireNode(row);
 
   renderTape();
   renderTapeStats();
@@ -395,11 +395,12 @@ function renderTape() {
 
     if (!node) {
       node = document.createElement('div');
-      node.className = 'print is-entering';
+      node.className = `print is-entering is-${row.direction}`;
       node.style.height = `${rowHeight}px`;
-      node.innerHTML = row.mode === 'phonetic'
-        ? `<span>${escapeHtml(row.ticker)}</span><span class="print-say">say</span>`
-        : `<span>${escapeHtml(row.ticker)}</span>`;
+      node.innerHTML =
+        `<span class="print-dir">${row.direction === 'up' ? '▲' : '▼'}</span>` +
+        `<span class="print-sym">${escapeHtml(row.ticker)}</span>` +
+        `<span class="print-mark">${row.mode === 'phonetic' ? 'say' : ''}</span>`;
       // Start one slot above the top so it slides down into place.
       node.style.transform = `translateY(${-rowHeight}px)`;
       board.append(node);
@@ -414,31 +415,33 @@ function renderTape() {
     node.classList.toggle('is-odd', index % 2 === 1);
     node.classList.toggle('is-match', reachable.has(row.id));
 
-    // Depth only means danger once the column is full.
+    if (row.taken) {
+      node.classList.add('is-taken');
+      node.querySelector('.print-mark').textContent = '✓';
+    }
+
+    // Depth only means danger for a print still worth taking.
     const full = tape.rows.length >= TAPE_ROWS;
     const fromBottom = tape.rows.length - 1 - index;
-    node.classList.toggle('is-urgent', full && fromBottom < 5 && fromBottom >= 2);
-    node.classList.toggle('is-critical', full && fromBottom < 2);
+    node.classList.toggle('is-urgent', !row.taken && full && fromBottom < 5 && fromBottom >= 2);
+    node.classList.toggle('is-critical', !row.taken && full && fromBottom < 2);
   });
 }
 
 /**
- * Retire a print's node. An escaped one slides on out of the bottom so it does
- * not sit on top of the row that takes its slot; a taken one fades in place.
+ * A print pushed off the bottom slides on out, so it never sits on top of the
+ * row taking its slot. Taken prints leave the same way, just without the red.
  */
-function retireNode(row, className) {
+function retireNode(row) {
   const node = state.tapeNodes.get(row.id);
   if (!node) return;
   state.tapeNodes.delete(row.id);
   node.classList.remove('is-match', 'is-urgent', 'is-critical');
-  node.classList.add(className);
+  node.classList.add(row.taken ? 'is-leaving' : 'is-escaped');
 
-  if (className === 'is-escaped') {
-    const board = $('tape');
-    const rowHeight = board.clientHeight / TAPE_ROWS;
-    const current = Number(/translateY\(([-\d.]+)px\)/.exec(node.style.transform)?.[1] ?? 0);
-    node.style.transform = `translateY(${current + rowHeight}px)`;
-  }
+  const rowHeight = $('tape').clientHeight / TAPE_ROWS;
+  const current = Number(/translateY\(([-\d.]+)px\)/.exec(node.style.transform)?.[1] ?? 0);
+  node.style.transform = `translateY(${current + rowHeight}px)`;
   setTimeout(() => node.remove(), 200);
 }
 
@@ -458,7 +461,7 @@ function renderTapeStats() {
   $('live-escaped').textContent = tape.escaped;
   $('tape-depth').textContent = `${tape.rows.length}/${TAPE_ROWS}`;
   $('tape-live').textContent = tape.rows.length >= TAPE_ROWS
-    ? 'Column full — the bottom row goes on the next print.'
+    ? 'Column full — the bottom row drops on the next print.'
     : `${TAPE_ROWS - tape.rows.length} rows before prints start dropping.`;
 }
 
@@ -469,7 +472,13 @@ function handleTapeSubmit() {
   const outcome = tape.submit(Date.now());
 
   if (outcome.hit) {
-    retireNode(outcome.row, 'is-hit');
+    // The print stays on the column; flash it so the hit registers.
+    const node = state.tapeNodes.get(outcome.row.id);
+    if (node) {
+      node.classList.remove('just-took');
+      void node.offsetHeight;
+      node.classList.add('just-took');
+    }
     input.value = '';
     return;
   }

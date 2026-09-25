@@ -9,20 +9,35 @@ whether you are actually getting faster.
 
 **The prints tape (default).** A 20-row column down the right of the screen.
 New prints land at the top and shove everything down a row; whatever falls off
-the bottom is gone and counts against you. Type a symbol, press <kbd>Enter</kbd>,
-and it comes off the column — everything below it rises a row, buying you time.
+the bottom is gone and counts against you. Type a symbol and press
+<kbd>Enter</kbd> to bank it. **The print stays on the column** — the tape does
+not shrink because you read it. It is marked with a tick, greys out, and rides
+the rest of the way down without counting against you. You cannot bank the same
+print twice, but a repeated symbol is a separate print each time, so a run of
+six needs six answers.
 
 Arrivals are deliberately clumpy — quiet stretches, then a burst — so the load
 is uneven and you will not always keep up. That is the point. Symbols also
 repeat in runs the way a real tape does: usually two or three together, and
 once in a while enough of one symbol to fill the entire column.
 
+Every print is green or red with an arrow, the way a tape shows which way it
+went. That is decoration — it does not change what you type or how you score.
+
 Three speeds: **Calm**, **Normal**, **Storm**. Runs are timed (1, 2 or 5
 minutes) rather than a fixed number of symbols. The column starts part-filled
-so there is a tape to read from the off. Rows turn amber, then red, as they
-near the bottom. Whatever you have typed highlights every print it could still
-match, and <kbd>Enter</kbd> always takes the **lowest** match — the one about to
-be pushed out.
+so there is a tape to read from the off. Whatever you have typed highlights
+every print it could still bank, and <kbd>Enter</kbd> always takes the **lowest
+unbanked** match — the one about to be pushed out.
+
+Four things have to read at once on a single row, so each gets its own channel:
+
+| Channel | Shows |
+|---|---|
+| Text colour + arrow | Which way the print went |
+| Blue bar, left edge | Reachable by what you have typed |
+| Background tint | Near the bottom — amber, then red |
+| Dimmed, with a tick | Already banked |
 
 **One at a time.** The original flow, still there under Drill style: a single
 symbol, answer it, <kbd>Enter</kbd>, next. Fixed run length, optional strict
@@ -36,9 +51,9 @@ which form each prompt wants.
 
 **Your symbols.** Paste any list on the Setup tab — commas, spaces and newlines
 all work. Dots, dashes and slashes are fine, so `BRK.B` and `RDS-A` behave.
-Save named lists for later; four starter lists ship with it, including a
-lookalikes set (`GOOG`/`GOOGL`, `TQQQ`/`SQQQ`, `VT`/`VTI`/`VTV`) and a
-hard-to-spell set.
+Save named lists for later. Five starter lists ship with it: the default
+**Watchlist** of 162 liquid names, plus index ETFs, mega caps, a lookalikes set
+(`GOOG`/`GOOGL`, `TQQQ`/`SQQQ`, `VT`/`VTI`/`VTV`) and a hard-to-spell set.
 
 **Live feedback.** Ticker prompts colour character by character as you type.
 Phonetic prompts show a chip per word that fills in as you get each one right.

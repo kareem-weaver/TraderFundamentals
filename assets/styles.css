@@ -15,6 +15,8 @@
   --bad: #e34948;
   --warn: #eda100;
   --track: #cde2fb;
+  --tape-up: #0f7a35;
+  --tape-down: #c62f2e;
   --radius: 12px;
   --shadow: 0 1px 2px rgb(15 15 15 / 6%), 0 8px 24px rgb(15 15 15 / 4%);
   --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
@@ -38,6 +40,8 @@
     --bad: #e66767;
     --warn: #c98500;
     --track: #184f95;
+    --tape-up: #3fa93f;
+    --tape-down: #e66767;
     --shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 8px 24px rgb(0 0 0 / 24%);
   }
 }
@@ -58,6 +62,8 @@
   --bad: #e66767;
   --warn: #c98500;
   --track: #184f95;
+  --tape-up: #3fa93f;
+  --tape-down: #e66767;
   --shadow: 0 1px 2px rgb(0 0 0 / 40%), 0 8px 24px rgb(0 0 0 / 24%);
 }
 
@@ -396,15 +402,21 @@ main { max-width: 1060px; margin: 0 auto; padding: 24px 16px 64px; }
   overflow: hidden;
 }
 
-/* A print sits in one row slot; the slot it sits in is set from JS. */
+/* A print sits in one row slot; the slot it sits in is set from JS.
+ *
+ * Four things need to read at once, so each gets its own channel:
+ *   direction  -> text colour, plus an arrow so it is never colour alone
+ *   reachable  -> blue bar down the left edge
+ *   about to drop -> background tint
+ *   already taken -> dimmed, with a tick
+ */
 .print {
   position: absolute;
   left: 0; right: 0;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  padding: 0 10px;
+  gap: 7px;
+  padding: 0 9px;
   border-bottom: 1px solid var(--border);
   font-family: var(--mono);
   font-size: 13.5px;
@@ -412,45 +424,58 @@ main { max-width: 1060px; margin: 0 auto; padding: 24px 16px 64px; }
   letter-spacing: 0.06em;
   white-space: nowrap;
   overflow: hidden;
-  color: var(--text-primary);
   background: var(--surface-0);
-  transition: transform 150ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity 150ms ease;
+  transition: transform 140ms cubic-bezier(0.22, 0.61, 0.36, 1),
+              opacity 160ms ease, background-color 160ms ease;
   will-change: transform;
 }
 
 /* Alternating tint so twenty rows stay countable. */
 .print.is-odd { background: var(--surface-1); }
 
-.print .print-say {
+.print-dir { font-size: 9px; line-height: 1; opacity: 0.9; }
+.print-sym { flex: 1; overflow: hidden; text-overflow: ellipsis; text-align: left; }
+.print-mark {
+  min-width: 18px;
+  text-align: right;
   font-size: 9.5px;
   font-weight: 400;
   letter-spacing: 0.04em;
-  color: var(--text-muted);
   text-transform: uppercase;
+  color: var(--text-muted);
 }
 
-/* Reachable by what is currently typed. */
-.print.is-match {
-  color: var(--series-1);
-  box-shadow: inset 2px 0 0 var(--series-1);
-}
+/* Channel 1 - which way the print went. */
+.print.is-up { color: var(--tape-up); }
+.print.is-down { color: var(--tape-down); }
 
-/* Near the bottom, about to be pushed out. */
-.print.is-urgent { color: var(--warn); box-shadow: inset 2px 0 0 var(--warn); }
-.print.is-critical { color: var(--bad); box-shadow: inset 2px 0 0 var(--bad); }
+/* Channel 2 - reachable by what is currently typed. */
+.print.is-match { box-shadow: inset 3px 0 0 var(--series-1); }
+
+/* Channel 3 - close to the bottom, about to be pushed out. */
+.print.is-urgent { background: color-mix(in srgb, var(--warn) 13%, var(--surface-0)); }
+.print.is-urgent.is-odd { background: color-mix(in srgb, var(--warn) 13%, var(--surface-1)); }
+.print.is-critical { background: color-mix(in srgb, var(--bad) 17%, var(--surface-0)); }
+.print.is-critical.is-odd { background: color-mix(in srgb, var(--bad) 17%, var(--surface-1)); }
+
+/* Channel 4 - already banked. It rides the rest of the way down, greyed out. */
+.print.is-taken { opacity: 0.34; }
+.print.is-taken .print-mark { color: var(--good); }
 
 .print.is-entering { opacity: 0; }
-
-.print.is-hit {
-  color: var(--good);
-  background: color-mix(in srgb, var(--good) 14%, transparent);
-  opacity: 0;
-}
-.print.is-escaped { color: var(--bad); opacity: 0; }
+.print.is-escaped { opacity: 0; }
+.print.is-leaving { opacity: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   .print { transition: none; }
 }
+
+/* A taken print flashes once so the hit registers before it dims. */
+@keyframes print-took {
+  from { background: color-mix(in srgb, var(--good) 45%, transparent); }
+}
+.print.just-took { animation: print-took 420ms ease-out; }
+@media (prefers-reduced-motion: reduce) { .print.just-took { animation: none; } }
 
 @media (max-width: 720px) {
   .tape-layout {

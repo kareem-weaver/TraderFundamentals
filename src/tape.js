@@ -17,7 +17,7 @@ export const TAPE_ROWS = 20;
 const PREFILL_ROWS = 12;
 
 /** Gap between arrivals inside a burst. */
-const BURST_GAP_MS = [120, 260];
+const BURST_GAP_MS = [80, 190];
 
 /**
  * How hard the tape runs. `spawnMs` is the gap between arrivals, which sets
@@ -26,18 +26,18 @@ const BURST_GAP_MS = [120, 260];
 export const INTENSITIES = {
   calm: {
     label: 'Calm',
-    note: 'Prints arrive with room to read them.',
-    spawnMs: [1700, 3000], burstChance: 0.1, burstSize: [2, 3], repeatChance: 0.1
+    note: 'Busy, but you can read every print.',
+    spawnMs: [850, 2000], burstChance: 0.16, burstSize: [2, 4], repeatChance: 0.1
   },
   normal: {
     label: 'Normal',
-    note: 'Steady, with the odd flurry.',
-    spawnMs: [950, 1900], burstChance: 0.2, burstSize: [2, 4], repeatChance: 0.14
+    note: 'Fast, and it comes in waves.',
+    spawnMs: [420, 1200], burstChance: 0.26, burstSize: [2, 5], repeatChance: 0.14
   },
   storm: {
     label: 'Storm',
-    note: 'The bottom of the column will get away from you.',
-    spawnMs: [450, 1150], burstChance: 0.32, burstSize: [3, 6], repeatChance: 0.18
+    note: 'The tape will beat you. Take what you can.',
+    spawnMs: [170, 640], burstChance: 0.4, burstSize: [3, 7], repeatChance: 0.18
   }
 };
 
@@ -169,14 +169,18 @@ export class TapeSession {
       ticker,
       mode,
       expected: expectedAnswer(ticker, mode),
-      spawnAt: at
+      spawnAt: at,
+      // Which way the print went. Cosmetic, but it is what a tape looks like.
+      direction: this.random() < 0.5 ? 'up' : 'down',
+      taken: false
     };
     this.rows.unshift(row);
 
     let evicted = null;
     if (this.rows.length > TAPE_ROWS) {
       evicted = this.rows.pop();
-      if (count) {
+      // Something already taken just leaves; only a missed print is an escape.
+      if (count && !evicted.taken) {
         this.escaped += 1;
         this.results.push({
           ticker: evicted.ticker,
@@ -196,20 +200,24 @@ export class TapeSession {
 
   /**
    * Advance the tape. Call once per animation frame.
-   * @returns {{spawned: object[], escaped: object[], finished: boolean}}
+   *
+   * `dropped` is every print pushed off the bottom this tick, taken or not, so
+   * the view can animate them out. Only the untaken ones counted as escapes.
+   *
+   * @returns {{spawned: object[], dropped: object[], finished: boolean}}
    */
   tick(at = this.now()) {
-    if (this.finished) return { spawned: [], escaped: [], finished: true };
+    if (this.finished) return { spawned: [], dropped: [], finished: true };
 
     const spawned = [];
-    const escaped = [];
+    const dropped = [];
     const overtime = this.startedAt !== null && at - this.startedAt >= this.durationMs;
 
     if (!overtime) {
       while (at >= this.nextSpawnAt) {
         const { row, evicted } = this.#push(at);
         spawned.push(row);
-        if (evicted) escaped.push(evicted);
+        if (evicted) dropped.push(evicted);
 
         // A burst is a rapid run of arrivals rather than a simultaneous block.
         if (this.burstRemaining > 0) {
@@ -236,13 +244,16 @@ export class TapeSession {
       this.endedAt = at;
       this.rows = [];
     }
-    return { spawned, escaped, finished: this.finished };
+    return { spawned, dropped, finished: this.finished };
   }
 
-  /** Prints whose answer could still become what is being typed. */
+  /**
+   * Prints whose answer could still become what is being typed. A print you
+   * have already taken is not offered again, even though it stays on screen.
+   */
   matching(typed = this.typed) {
     if (typed.trim() === '') return [];
-    return this.rows.filter((row) => isOnTrack(row.ticker, typed, row.mode));
+    return this.rows.filter((row) => !row.taken && isOnTrack(row.ticker, typed, row.mode));
   }
 
   /**
@@ -266,8 +277,13 @@ export class TapeSession {
   }
 
   /**
-   * Commit what is typed. Takes the lowest matching print, since that is the
-   * one about to be pushed off. Everything below it rises a row.
+   * Commit what is typed. Scores the lowest print not yet taken, since that is
+   * the one about to be pushed off.
+   *
+   * The print stays on the column and keeps riding down to the bottom - the
+   * tape does not shrink because you read it. It is just marked, so it cannot
+   * be scored twice and will not count as an escape when it drops off.
+   *
    * @returns {{hit: boolean, row?: object}}
    */
   submit(at = this.now()) {
@@ -276,7 +292,8 @@ export class TapeSession {
 
     let target = -1;
     for (let i = this.rows.length - 1; i >= 0; i -= 1) {
-      if (isAnswerCorrect(this.rows[i].ticker, typed, this.rows[i].mode)) {
+      const row = this.rows[i];
+      if (!row.taken && isAnswerCorrect(row.ticker, typed, row.mode)) {
         target = i;
         break;
       }
@@ -289,7 +306,8 @@ export class TapeSession {
       return { hit: false, typed };
     }
 
-    const [row] = this.rows.splice(target, 1);
+    const row = this.rows[target];
+    row.taken = true;
     this.hits += 1;
     this.results.push({
       ticker: row.ticker,

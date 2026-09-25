@@ -358,3 +358,95 @@ main { max-width: 1060px; margin: 0 auto; padding: 24px 16px 64px; }
   .run-live { gap: 14px; width: 100%; justify-content: space-between; }
   .stage { padding: 28px 16px; min-height: 360px; }
 }
+
+/* ── Prints tape ────────────────────────────────────────────────────────── */
+#panel-tape { max-width: 760px; }
+
+.tape {
+  position: relative;
+  height: clamp(300px, 52vh, 440px);
+  margin-bottom: 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-0);
+  overflow: hidden;
+  /* Prints dissolve as they reach the top rather than clipping off an edge. */
+  mask-image: linear-gradient(to bottom, transparent 0, #000 12%, #000 100%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 12%, #000 100%);
+}
+
+/* The line a print must be taken before. */
+.tape-escape-line {
+  position: absolute;
+  left: 0; right: 0; top: 12%;
+  border-top: 1px dashed var(--border-strong);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.print {
+  position: absolute;
+  top: 0; left: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface-1);
+  font-family: var(--mono);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  will-change: transform;
+}
+
+.print .print-say {
+  font-size: 11.5px;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--text-muted);
+}
+
+/* Reachable by what is currently typed. */
+.print.is-match {
+  border-color: var(--series-1);
+  color: var(--series-1);
+  box-shadow: 0 0 0 3px rgb(42 120 214 / 16%);
+}
+
+/* About to escape. */
+.print.is-urgent { border-color: var(--warn); }
+.print.is-critical { border-color: var(--bad); color: var(--bad); }
+
+.print.is-hit {
+  border-color: var(--good);
+  color: var(--good);
+  transition: opacity 200ms ease, transform 200ms ease;
+  opacity: 0;
+}
+
+.print.is-escaped {
+  border-color: var(--bad);
+  color: var(--bad);
+  transition: opacity 200ms ease;
+  opacity: 0;
+}
+
+.tape-live { margin-left: 10px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+.tape-empty {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text-muted); font-size: 13px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .print.is-hit, .print.is-escaped { transition: none; }
+}
+
+@media (max-width: 640px) {
+  .tape { height: clamp(260px, 46vh, 360px); }
+  .print { font-size: 16px; padding: 5px 10px; }
+}

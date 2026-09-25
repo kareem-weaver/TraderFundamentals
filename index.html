@@ -37,9 +37,10 @@
         <div class="progress-track"><div class="progress-fill" id="run-progress-fill"></div></div>
       </div>
       <div class="run-live">
-        <span class="live-stat"><b id="live-timer">0.0s</b><small>elapsed</small></span>
+        <span class="live-stat"><b id="live-timer">0.0s</b><small id="live-timer-label">elapsed</small></span>
         <span class="live-stat"><b id="live-accuracy">100%</b><small>accuracy</small></span>
-        <span class="live-stat"><b id="live-wpm">0</b><small>wpm</small></span>
+        <span class="live-stat"><b id="live-wpm">0</b><small id="live-wpm-label">wpm</small></span>
+        <span class="live-stat" id="live-escaped-wrap" hidden><b id="live-escaped">0</b><small>escaped</small></span>
       </div>
     </div>
 
@@ -65,11 +66,25 @@
         </p>
       </div>
 
+      <!-- Tape -->
+      <div class="stage-panel" id="panel-tape">
+        <div class="tape" id="tape" aria-hidden="true">
+          <div class="tape-escape-line"></div>
+        </div>
+        <label class="sr-only" for="tape-answer">Type a symbol from the tape</label>
+        <input id="tape-answer" class="answer" type="text" autocomplete="off" autocorrect="off"
+               autocapitalize="off" spellcheck="false" placeholder="type a symbol, then Enter" />
+        <p class="stage-note">
+          <kbd>Enter</kbd> take it · <kbd>Esc</kbd> end run
+          <span class="tape-live" id="tape-live"></span>
+        </p>
+      </div>
+
       <!-- Results -->
       <div class="stage-panel" id="panel-done">
         <p class="stage-kicker">Run complete</p>
         <div class="hero" id="result-hero">0</div>
-        <p class="hero-label">words per minute</p>
+        <p class="hero-label" id="hero-label">words per minute</p>
         <div class="result-grid" id="result-grid"></div>
         <div class="result-actions">
           <button class="primary" id="again-button">Run again</button>
@@ -146,7 +161,16 @@
       </div>
 
       <div class="card">
-        <h3>Mode</h3>
+        <h3>Drill style</h3>
+        <div class="segmented wide" id="style-picker" role="group" aria-label="Drill style">
+          <button data-style="tape" class="is-active">Prints tape</button>
+          <button data-style="single">One at a time</button>
+        </div>
+        <p class="field-note" id="style-note">
+          Symbols surface at the bottom and rise. Take them before they reach the top.
+        </p>
+
+        <h3 class="spaced">Mode</h3>
         <div class="segmented wide" id="mode-picker" role="group" aria-label="Test mode">
           <button data-mode="ticker" class="is-active">Ticker</button>
           <button data-mode="phonetic">Phonetic</button>
@@ -154,23 +178,42 @@
         </div>
         <p class="field-note" id="mode-note">Type the symbol exactly as shown.</p>
 
-        <h3 class="spaced">Run length</h3>
-        <div class="segmented wide" id="length-picker" role="group" aria-label="Run length">
-          <button data-length="10">10</button>
-          <button data-length="20" class="is-active">20</button>
-          <button data-length="50">50</button>
-          <button data-length="0">All</button>
+        <div id="tape-settings">
+          <h3 class="spaced">Tape speed</h3>
+          <div class="segmented wide" id="intensity-picker" role="group" aria-label="Tape speed">
+            <button data-intensity="calm">Calm</button>
+            <button data-intensity="normal" class="is-active">Normal</button>
+            <button data-intensity="storm">Storm</button>
+          </div>
+          <p class="field-note" id="intensity-note">Steady, with the odd flurry.</p>
+
+          <h3 class="spaced">Run time</h3>
+          <div class="segmented wide" id="duration-picker" role="group" aria-label="Run time">
+            <button data-duration="60000">1 min</button>
+            <button data-duration="120000" class="is-active">2 min</button>
+            <button data-duration="300000">5 min</button>
+          </div>
         </div>
 
-        <h3 class="spaced">Options</h3>
-        <label class="toggle">
-          <input type="checkbox" id="order-toggle" checked />
-          <span>Shuffle the order</span>
-        </label>
-        <label class="toggle">
-          <input type="checkbox" id="strict-toggle" />
-          <span>Strict — a wrong answer won't advance</span>
-        </label>
+        <div id="single-settings" hidden>
+          <h3 class="spaced">Run length</h3>
+          <div class="segmented wide" id="length-picker" role="group" aria-label="Run length">
+            <button data-length="10">10</button>
+            <button data-length="20" class="is-active">20</button>
+            <button data-length="50">50</button>
+            <button data-length="0">All</button>
+          </div>
+
+          <h3 class="spaced">Options</h3>
+          <label class="toggle">
+            <input type="checkbox" id="order-toggle" checked />
+            <span>Shuffle the order</span>
+          </label>
+          <label class="toggle">
+            <input type="checkbox" id="strict-toggle" />
+            <span>Strict — a wrong answer won't advance</span>
+          </label>
+        </div>
       </div>
 
       <div class="card">

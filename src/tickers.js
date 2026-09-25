@@ -17,6 +17,14 @@ export const PRESETS = [
     tickers: 'GOOG GOOGL BRK.A BRK.B VZ VT VTI VTV VUG VXX TQQQ SQQQ QQQ QQQM SPY SPXL SPXS UVXY SOXL SOXS'
   },
   {
+    name: 'Watchlist',
+    tickers:
+      'DVA SIX C GM FITB PNFP CVS QMCO APUS WYY JAGX FORM VMO IQMX BTTC ILMN TBBB KITT ' +
+      'MSGY CNC HUM RGTI AZO GRLM OPEN LH CHKP TRS MEGI PZT INSM MOD GWH MSCI CHTR O ' +
+      'WARP BRN MGM QCOM OIG LITE GLND SNDK AXTX TEMP SRZN QBTS INVH JAN UDR PECO GII ' +
+      'IONQ PICB SBR FOX RMI SGU NAD APP ONEN'
+  },
+  {
     name: 'Hard to spell',
     tickers: 'NVDA NVAX NVDY XYLD JEPI JEPQ SCHD SCHG IBIT FBTC ARKK ARKG SMCI CRWD PLTR ASML TSM AMD MU QCOM'
   }
@@ -29,7 +37,9 @@ export const PRESETS = [
 export function parseTickers(input, { dedupe = true } = {}) {
   const raw = String(input ?? '')
     .split(/[\s,;|]+/)
-    .map((token) => token.trim().toUpperCase())
+    // Trailing punctuation is almost always list formatting ("nad. app"), not
+    // part of the symbol. Interior separators (BRK.B, RDS-A) are left alone.
+    .map((token) => token.trim().toUpperCase().replace(/^[.\-/]+|[.\-/]+$/g, ''))
     .filter(Boolean);
 
   const tickers = [];

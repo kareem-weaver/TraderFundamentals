@@ -1,6 +1,7 @@
 // UI wiring. All scoring lives in engine.js; all aggregation in stats.js.
 
 import { MODES, Session } from './engine.js';
+import { INTENSITIES, LANES, TapeSession } from './tape.js';
 import { PRESETS, parseTickers } from './tickers.js';
 import { store } from './storage.js';
 import { overallStats, progressSeries, tickerStats, trend, weakTickers } from './stats.js';
@@ -13,11 +14,16 @@ const on = (node, event, handler) => node.addEventListener(event, handler);
 const state = {
   view: 'test',
   session: null,
+  tape: null,
+  tapeNodes: new Map(),
+  frame: null,
   tickers: [],
   settings: store.settings(),
   tickerFilter: 'all',
   timer: null
 };
+
+const isTape = () => (state.settings.style ?? 'tape') === 'tape';
 
 /* ── Small helpers ──────────────────────────────────────────────────────── */
 
@@ -61,7 +67,10 @@ function setView(view) {
     section.classList.toggle('is-active', section.id === `view-${view}`);
   }
   if (view === 'progress') renderProgress();
-  if (view === 'test' && state.session && !state.session.finished) $('answer').focus();
+  if (view === 'test') {
+    if (state.tape && !state.tape.finished) $('tape-answer').focus();
+    else if (state.session && !state.session.finished) $('answer').focus();
+  }
 }
 
 /* ── Setup view ─────────────────────────────────────────────────────────── */
@@ -127,24 +136,63 @@ function renderSavedLists() {
 }
 
 function renderIdleNote() {
-  const count = state.settings.length || state.tickers.length;
   const mode = MODES[state.settings.mode]?.label ?? 'Ticker';
-  $('idle-note').textContent = state.tickers.length === 0
-    ? 'Add some symbols on the Setup tab first.'
-    : `${count} prompt${count === 1 ? '' : 's'} from ${currentListName()}, ${mode.toLowerCase()} mode.`;
+  const tape = isTape();
+
+  if (state.tickers.length === 0) {
+    $('idle-note').textContent = 'Add some symbols on the Setup tab first.';
+  } else if (tape) {
+    const minutes = Math.round((state.settings.durationMs ?? 120000) / 60000);
+    const speed = INTENSITIES[state.settings.intensity ?? 'normal'].label.toLowerCase();
+    $('idle-note').textContent =
+      `${minutes} min on the ${speed} tape, ${state.tickers.length} symbols, ${mode.toLowerCase()} mode.`;
+  } else {
+    const count = state.settings.length || state.tickers.length;
+    $('idle-note').textContent =
+      `${count} prompt${count === 1 ? '' : 's'} from ${currentListName()}, ${mode.toLowerCase()} mode.`;
+  }
+
   $('run-list').textContent = currentListName();
-  $('run-mode').textContent = mode;
-  $('run-counter').textContent = `0 / ${count}`;
+  $('run-mode').textContent = tape
+    ? `${mode} · ${INTENSITIES[state.settings.intensity ?? 'normal'].label} tape`
+    : mode;
+  $('run-counter').textContent = tape
+    ? '0 taken'
+    : `0 / ${state.settings.length || state.tickers.length}`;
+  $('live-escaped-wrap').hidden = !tape;
+  $('live-timer-label').textContent = tape ? 'left' : 'elapsed';
+  $('live-wpm-label').textContent = tape ? 'per min' : 'wpm';
 }
 
 function syncSettingsUI() {
   const { mode, length, order, strict } = state.settings;
+  const style = state.settings.style ?? 'tape';
+  const intensity = state.settings.intensity ?? 'normal';
+  const durationMs = state.settings.durationMs ?? 120000;
+
+  for (const button of $('style-picker').children) {
+    button.classList.toggle('is-active', button.dataset.style === style);
+  }
   for (const button of $('mode-picker').children) {
     button.classList.toggle('is-active', button.dataset.mode === mode);
   }
   for (const button of $('length-picker').children) {
     button.classList.toggle('is-active', Number(button.dataset.length) === Number(length));
   }
+  for (const button of $('intensity-picker').children) {
+    button.classList.toggle('is-active', button.dataset.intensity === intensity);
+  }
+  for (const button of $('duration-picker').children) {
+    button.classList.toggle('is-active', Number(button.dataset.duration) === Number(durationMs));
+  }
+
+  $('tape-settings').hidden = style !== 'tape';
+  $('single-settings').hidden = style === 'tape';
+  $('style-note').textContent = style === 'tape'
+    ? 'Symbols surface at the bottom and rise. Take them before they reach the top.'
+    : 'One symbol at a time. Answer it, press Enter, get the next.';
+  $('intensity-note').textContent = INTENSITIES[intensity].note;
+
   $('order-toggle').checked = order !== 'sequential';
   $('strict-toggle').checked = Boolean(strict);
   $('mode-note').textContent = MODES[mode]?.hint ?? '';
@@ -157,6 +205,10 @@ function startRun(tickers = state.tickers) {
   if (tickers.length === 0) {
     toast('Add some symbols on the Setup tab first.', true);
     setView('setup');
+    return;
+  }
+  if (isTape()) {
+    startTape(tickers);
     return;
   }
   const { mode, order, length, strict } = state.settings;
@@ -287,7 +339,167 @@ function renderFinalStats(summary) {
   $('live-wpm').textContent = Math.round(summary.wpm);
 }
 
+/* ── Prints tape ────────────────────────────────────────────────────────── */
+
+function startTape(tickers) {
+  stopTape();
+  state.tape = new TapeSession(tickers, {
+    mode: state.settings.mode,
+    intensity: state.settings.intensity ?? 'normal',
+    durationMs: state.settings.durationMs ?? 120000,
+    listName: currentListName()
+  }).start();
+
+  setView('test');
+  setPanel('tape');
+  $('tape').querySelectorAll('.print').forEach((node) => node.remove());
+  state.tapeNodes.clear();
+  $('tape-answer').value = '';
+  $('tape-answer').classList.remove('is-wrong');
+  $('tape-answer').focus();
+  state.frame = requestAnimationFrame(tapeFrame);
+}
+
+function stopTape() {
+  if (state.frame !== null) cancelAnimationFrame(state.frame);
+  state.frame = null;
+}
+
+function tapeFrame() {
+  const tape = state.tape;
+  if (!tape) return;
+
+  const now = Date.now();
+  const { escaped, finished } = tape.tick(now);
+  for (const row of escaped) retireNode(row, 'is-escaped');
+
+  renderTape(now);
+  renderTapeStats();
+
+  if (finished) {
+    finishTape();
+    return;
+  }
+  state.frame = requestAnimationFrame(tapeFrame);
+}
+
+/** Position every live print, and mark the ones the typed text can still reach. */
+function renderTape(now) {
+  const tape = state.tape;
+  const board = $('tape');
+  const height = board.clientHeight;
+  const width = board.clientWidth;
+  const reachable = new Set(tape.matching().map((row) => row.id));
+
+  for (const row of tape.rows) {
+    let node = state.tapeNodes.get(row.id);
+    if (!node) {
+      node = document.createElement('div');
+      node.className = 'print';
+      node.innerHTML = row.mode === 'phonetic'
+        ? `${escapeHtml(row.ticker)}<span class="print-say">say it</span>`
+        : escapeHtml(row.ticker);
+      board.append(node);
+      state.tapeNodes.set(row.id, node);
+    }
+
+    const progress = Math.min(1, tape.progressOf(row, now));
+    // Lanes keep simultaneous prints from landing on top of each other.
+    const laneWidth = width / LANES;
+    const x = row.lane * laneWidth + row.jitter * Math.max(0, laneWidth - node.offsetWidth - 8) + 4;
+    const y = (height - node.offsetHeight) * (1 - progress);
+    node.style.transform = `translate(${Math.round(x)}px, ${Math.round(y)}px)`;
+
+    node.classList.toggle('is-match', reachable.has(row.id));
+    node.classList.toggle('is-urgent', progress > 0.7 && progress <= 0.88);
+    node.classList.toggle('is-critical', progress > 0.88);
+  }
+}
+
+/** Fade a print out, then drop its node. */
+function retireNode(row, className) {
+  const node = state.tapeNodes.get(row.id);
+  if (!node) return;
+  state.tapeNodes.delete(row.id);
+  node.classList.add(className);
+  setTimeout(() => node.remove(), 220);
+}
+
+function renderTapeStats() {
+  const tape = state.tape;
+  const resolved = tape.hits + tape.escaped;
+  $('run-counter').textContent = `${tape.hits} taken`;
+  $('run-progress-fill').style.width =
+    `${Math.min(100, (tape.elapsedMs / tape.durationMs) * 100)}%`;
+  $('live-timer').textContent = `${Math.ceil(tape.remainingMs / 1000)}s`;
+  $('live-accuracy').textContent = resolved > 0
+    ? `${Math.round((tape.hits / resolved) * 100)}%`
+    : '100%';
+  $('live-wpm').textContent = tape.elapsedMs > 0
+    ? Math.round(tape.hits / (tape.elapsedMs / 60000))
+    : 0;
+  $('live-escaped').textContent = tape.escaped;
+  $('tape-live').textContent = `${tape.rows.length} on the tape`;
+}
+
+function handleTapeSubmit() {
+  const tape = state.tape;
+  if (!tape || tape.finished) return;
+  const input = $('tape-answer');
+  const outcome = tape.submit(Date.now());
+
+  if (outcome.hit) {
+    retireNode(outcome.row, 'is-hit');
+    input.value = '';
+    return;
+  }
+  if (!outcome.empty) {
+    input.value = '';
+    input.classList.add('is-wrong');
+    setTimeout(() => input.classList.remove('is-wrong'), 240);
+  }
+}
+
+function finishTape() {
+  stopTape();
+  const summary = state.tape.finished ? state.tape.summary() : state.tape.end();
+  if (summary.prompts > 0) store.addSession(summary);
+  renderTapeResults(summary);
+  setPanel('done');
+  state.tape = null;
+}
+
+function renderTapeResults(summary) {
+  $('result-hero').textContent = summary.correct;
+  $('hero-label').textContent = `symbols taken off the tape · ${summary.escaped} escaped`;
+
+  const cells = [
+    ['Caught', `${summary.promptAccuracy}%`],
+    ['Per minute', summary.tickersPerMinute],
+    ['Escaped', summary.escaped],
+    ['Keystrokes', `${summary.keystrokeAccuracy}%`],
+    ['Busiest', `${summary.peakLive} at once`],
+    ['Run time', fmtDuration(summary.elapsedMs)]
+  ];
+  $('result-grid').innerHTML = cells
+    .map(([label, value]) => `<div class="result-cell"><b>${value}</b><span>${label}</span></div>`)
+    .join('');
+
+  const rows = summary.results
+    .map((r) => `<tr class="${r.correct ? '' : 'wrong'}">
+      <td>${r.ticker}</td>
+      <td><span class="tag">${r.mode}</span></td>
+      <td class="typed">${r.correct ? '✓ taken' : 'escaped'}</td>
+      <td class="num">${fmtSeconds(r.ms)}</td>
+    </tr>`)
+    .join('');
+  $('result-table').innerHTML = `
+    <thead><tr><th>Symbol</th><th>Mode</th><th>Outcome</th><th>On screen</th></tr></thead>
+    <tbody>${rows}</tbody>`;
+}
+
 function renderResults(summary) {
+  $('hero-label').textContent = 'words per minute';
   $('result-hero').textContent = summary.wpm;
 
   const cells = [
@@ -414,7 +626,7 @@ function renderSessionTable(sessions) {
   const body = recent
     .map((s) => `<tr>
       <td>${fmtDate(s.endedAt)}</td>
-      <td><span class="tag">${s.mode}</span></td>
+      <td><span class="tag">${s.style === 'tape' ? 'tape' : 'single'} · ${s.mode}</span></td>
       <td>${escapeHtml(s.listName ?? '—')}</td>
       <td class="num">${s.correct}/${s.prompts}</td>
       <td class="num">${s.wpm}</td>
@@ -555,10 +767,24 @@ function wire() {
     }
   });
 
+  const tapeAnswer = $('tape-answer');
+  on(tapeAnswer, 'input', () => {
+    state.tape?.type(tapeAnswer.value);
+  });
+  on(tapeAnswer, 'keydown', (event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      handleTapeSubmit();
+    } else if (event.key === 'Escape') {
+      event.preventDefault();
+      if (state.tape) finishTape();
+    }
+  });
+
   // Enter starts a run from the idle and results panels.
   on(document, 'keydown', (event) => {
     if (event.key !== 'Enter' || state.view !== 'test') return;
-    if (document.activeElement === answer) return;
+    if (document.activeElement === answer || document.activeElement === tapeAnswer) return;
     const idle = $('panel-idle').classList.contains('is-active');
     const done = $('panel-done').classList.contains('is-active');
     if (idle || done) {
@@ -588,6 +814,27 @@ function wire() {
   });
 
   on($('clear-list-button'), 'click', () => loadTickerInput('', 'Custom'));
+
+  on($('style-picker'), 'click', (event) => {
+    const button = event.target.closest('button');
+    if (!button) return;
+    state.settings = store.saveSettings({ style: button.dataset.style });
+    syncSettingsUI();
+  });
+
+  on($('intensity-picker'), 'click', (event) => {
+    const button = event.target.closest('button');
+    if (!button) return;
+    state.settings = store.saveSettings({ intensity: button.dataset.intensity });
+    syncSettingsUI();
+  });
+
+  on($('duration-picker'), 'click', (event) => {
+    const button = event.target.closest('button');
+    if (!button) return;
+    state.settings = store.saveSettings({ durationMs: Number(button.dataset.duration) });
+    syncSettingsUI();
+  });
 
   on($('mode-picker'), 'click', (event) => {
     const button = event.target.closest('button');

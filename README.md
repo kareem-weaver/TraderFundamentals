@@ -7,6 +7,21 @@ whether you are actually getting faster.
 
 ## What it does
 
+**The prints tape (default).** Symbols surface at the bottom of a window and
+rise, each at its own speed. Type one, press <kbd>Enter</kbd>, and it comes off
+the tape. Anything that reaches the top escapes and counts against you.
+Arrivals are deliberately clumpy — long quiet stretches, then a burst — so the
+load is uneven and you will not always keep up. That is the point.
+
+Three speeds: **Calm**, **Normal**, **Storm**. Runs are timed (1, 2 or 5
+minutes) rather than a fixed number of symbols. Prints turn amber, then red, as
+they near the top. Whatever you have typed highlights every print it could
+still match, and <kbd>Enter</kbd> always takes the one closest to escaping.
+
+**One at a time.** The original flow, still there under Drill style: a single
+symbol, answer it, <kbd>Enter</kbd>, next. Fixed run length, optional strict
+mode where a wrong answer will not advance.
+
 **Two things to type.** In *ticker* mode the prompt is `QQQ` and you type `QQQ`.
 In *phonetic* mode the prompt is still `QQQ` but the answer is
 `quebec quebec quebec` — the NATO alphabet, the way you would read the symbol
@@ -27,9 +42,11 @@ Phonetic prompts show a chip per word that fills in as you get each one right.
 | Measure | How it is worked out |
 |---|---|
 | WPM | Five characters counts as one word, over time spent actually typing |
-| Accuracy | Prompts answered correctly |
-| Keystroke accuracy | Characters that were right when typed — a typo you fix still costs you |
-| Time per prompt | Prompt appearing → <kbd>Enter</kbd> |
+| Accuracy | Prompts answered correctly; on the tape, taken vs. escaped |
+| Keystroke accuracy | Characters that were right when typed — a typo you fix still costs you. On the tape, a keystroke is right while it still reaches something on screen |
+| Time per prompt | Prompt appearing → <kbd>Enter</kbd>; on the tape, from when it surfaced |
+| Per minute | Symbols taken off the tape per minute — the number that says "keeping up" |
+| Busiest | The most prints on screen at once |
 | Clean | Correct with no wrong keys and no backspaces |
 
 **History.** Every run is saved. The Progress tab charts speed and accuracy over
@@ -42,8 +59,8 @@ those, so practice goes where it is needed.
 | Key | |
 |---|---|
 | <kbd>Enter</kbd> | Submit, and start a run from the idle or results screen |
-| <kbd>Tab</kbd> | Skip (counts as incorrect) |
-| <kbd>Esc</kbd> | End the run early — answers so far still count |
+| <kbd>Tab</kbd> | Skip (one at a time only; counts as incorrect) |
+| <kbd>Esc</kbd> | End the run early — answers so far still count, and prints still on the tape are not held against you |
 
 ### Phonetic answers it accepts
 
@@ -102,7 +119,8 @@ index.html          markup
 assets/styles.css   light + dark tokens, all styling
 src/phonetic.js     NATO alphabet, alternate spellings, answer grading
 src/tickers.js      list parsing, presets, run queue
-src/engine.js       session state machine, timing and keystroke scoring
+src/engine.js       one-at-a-time state machine, timing and keystroke scoring
+src/tape.js         the prints tape: arrivals, speeds, lanes, escapes
 src/stats.js        history rollups, weak-symbol picking, streaks
 src/storage.js      localStorage, export/import, merge
 src/chart.js        inline-SVG progress charts
@@ -111,8 +129,15 @@ src/app.js          UI wiring
 test/               node:test suites for everything above
 ```
 
-`engine.js`, `phonetic.js`, `stats.js`, `tickers.js` and `storage.js` hold no DOM
-references, which is what lets the test suite cover the scoring rules directly.
+`engine.js`, `tape.js`, `phonetic.js`, `stats.js`, `tickers.js` and `storage.js`
+hold no DOM references, which is what lets the test suite cover the scoring
+rules directly. The tape takes its clock and its randomness as arguments, so
+arrival timing, escapes and bursts are all tested deterministically.
+
+Both drill styles emit the same session shape, so history, the progress charts
+and the per-symbol table treat them identically — a symbol you keep letting
+escape shows up in exactly the same weakest-first table as one you keep
+misspelling.
 
 ## Licence
 

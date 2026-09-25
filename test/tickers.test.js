@@ -17,9 +17,17 @@ test('dedupes by default and can be told not to', () => {
 });
 
 test('reports rejected junk instead of silently dropping it', () => {
-  const { tickers, rejected } = parseTickers('SPY $$$ QQQ .BAD');
+  const { tickers, rejected } = parseTickers('SPY $$$ QQQ @NO');
   assert.deepEqual(tickers, ['SPY', 'QQQ']);
-  assert.deepEqual(rejected, ['$$$', '.BAD']);
+  assert.deepEqual(rejected, ['$$$', '@NO']);
+});
+
+test('strips separator punctuation left over from list formatting', () => {
+  // "nad. app" is a comma-less list, not a symbol called NAD.
+  assert.deepEqual(parseTickers('nad. app').tickers, ['NAD', 'APP']);
+  assert.deepEqual(parseTickers('.BAD SPY-').tickers, ['BAD', 'SPY']);
+  assert.deepEqual(parseTickers('BRK.B RDS-A ES/Z4').tickers, ['BRK.B', 'RDS-A', 'ES/Z4'],
+    'interior separators are part of the symbol');
 });
 
 test('empty input yields nothing', () => {

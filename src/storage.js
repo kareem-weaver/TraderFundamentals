@@ -8,7 +8,16 @@ const EMPTY = {
   version: 1,
   sessions: [],
   lists: [],
-  settings: { mode: 'ticker', order: 'shuffle', length: 20, strict: false, listName: 'Index ETFs' }
+  settings: {
+    style: 'tape',
+    mode: 'ticker',
+    order: 'shuffle',
+    length: 20,
+    strict: false,
+    intensity: 'normal',
+    durationMs: 120000,
+    listName: 'Watchlist'
+  }
 };
 
 function read() {

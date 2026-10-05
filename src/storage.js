@@ -14,7 +14,7 @@ const EMPTY = {
     order: 'shuffle',
     length: 20,
     strict: false,
-    intensity: 'normal',
+    speed: 5,
     durationMs: 120000,
     listName: 'Watchlist'
   }
@@ -25,10 +25,23 @@ function read() {
     const raw = localStorage.getItem(KEY);
     if (!raw) return structuredClone(EMPTY);
     const parsed = JSON.parse(raw);
-    return { ...structuredClone(EMPTY), ...parsed };
+    const state = { ...structuredClone(EMPTY), ...parsed };
+    state.settings = migrateSettings(state.settings);
+    return state;
   } catch {
     return structuredClone(EMPTY);
   }
+}
+
+/** Tape speed used to be three named presets; it is now a 1-10 dial. */
+export function migrateSettings(settings = {}) {
+  const legacy = { calm: 3, normal: 5, storm: 8 };
+  if (settings.speed === undefined && typeof settings.intensity === 'string') {
+    const { intensity, ...rest } = settings;
+    return { ...rest, speed: legacy[intensity] ?? 5 };
+  }
+  const { intensity, ...rest } = settings;
+  return rest;
 }
 
 function write(state) {

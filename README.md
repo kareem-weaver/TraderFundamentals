@@ -24,8 +24,18 @@ once in a while enough of one symbol to fill the entire column.
 Every print is green or red with an arrow, the way a tape shows which way it
 went. That is decoration — it does not change what you type or how you score.
 
-Three speeds: **Calm**, **Normal**, **Storm**. Runs are timed (1, 2 or 5
-minutes) rather than a fixed number of symbols. The column starts part-filled
+Speed is a dial from **1 to 10**, and the setup screen tells you what you
+picked in seconds: *"a print stays on the column about 17s in ticker mode"*.
+Each step up is the same proportional jump in pressure, from roughly 52s per
+print at 1 down to 4s at 10. Runs are timed (1, 2 or 5 minutes) rather than a
+fixed number of symbols.
+
+**Phonetic gets more room at the same number.** `SPY` is three keystrokes;
+`sierra papa yankee` is eighteen plus the recall, about five times the work.
+A print survives the same twenty arrivals whatever you are typing, so the only
+lever is how fast prints arrive — phonetic runs at 3.5× the gap, mixed at
+2.25×. Speed 5 is 17s per print in ticker mode and 58s in phonetic, which is
+the point: the number means comparable difficulty, not an identical clock. The column starts part-filled
 so there is a tape to read from the off. Whatever you have typed highlights
 every print it could still bank, and <kbd>Enter</kbd> always takes the **lowest
 unbanked** match — the one about to be pushed out.
@@ -67,6 +77,7 @@ Phonetic prompts show a chip per word that fills in as you get each one right.
 | Keystroke accuracy | Characters that were right when typed — a typo you fix still costs you. On the tape, a keystroke is right while it still reaches something on screen |
 | Time per prompt | Prompt appearing → <kbd>Enter</kbd>; on the tape, from when it surfaced |
 | Per minute | Symbols taken off the tape per minute — the number that says "keeping up" |
+| Speed | The 1–10 setting the run was done at |
 | Longest run | The longest streak of one symbol repeating down the column |
 | Clean | Correct with no wrong keys and no backspaces |
 
@@ -141,7 +152,7 @@ assets/styles.css   light + dark tokens, all styling
 src/phonetic.js     NATO alphabet, alternate spellings, answer grading
 src/tickers.js      list parsing, presets, run queue
 src/engine.js       one-at-a-time state machine, timing and keystroke scoring
-src/tape.js         the prints tape: the 20-row stack, arrivals, repeat runs
+src/tape.js         the prints tape: the 20-row stack, the speed dial, repeat runs
 src/stats.js        history rollups, weak-symbol picking, streaks
 src/storage.js      localStorage, export/import, merge
 src/chart.js        inline-SVG progress charts
@@ -154,7 +165,9 @@ test/               node:test suites for everything above
 hold no DOM references, which is what lets the test suite cover the scoring
 rules directly. The tape takes its clock and its randomness as arguments, so
 arrival timing, push-outs, repeat runs and bursts are all tested
-deterministically.
+deterministically — including a simulation that runs each speed for a long
+stretch and checks the tape really arrives at the rate the setup screen
+advertises.
 
 Both drill styles emit the same session shape, so history, the progress charts
 and the per-symbol table treat them identically — a symbol you keep letting

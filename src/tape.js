@@ -18,32 +18,127 @@ const PREFILL_ROWS = 12;
 
 /** Gap between arrivals inside a burst. */
 const BURST_GAP_MS = [80, 190];
+const BURST_GAP_MEAN = (BURST_GAP_MS[0] + BURST_GAP_MS[1]) / 2;
+
+/* ── Pace ───────────────────────────────────────────────────────────────── */
+
+export const SPEED_MIN = 1;
+export const SPEED_MAX = 10;
+export const SPEED_DEFAULT = 5;
+
+/** Gap between arrivals at the slowest and fastest settings, in ms. */
+const GAP_AT_SLOWEST = 2600;
+const GAP_AT_FASTEST = 200;
 
 /**
- * How hard the tape runs. `spawnMs` is the gap between arrivals, which sets
- * both the pressure and how long a print survives (20 rows x the gap).
+ * How much longer each mode needs per print.
+ *
+ * A print survives TAPE_ROWS arrivals however you are answering, so the only
+ * lever is the arrival gap. "SPY" is three keystrokes; "sierra papa yankee" is
+ * eighteen plus the recall, roughly five times the work. Without this, phonetic
+ * at a given speed is far harder than ticker at the same speed, which is not
+ * what picking a speed should mean.
  */
-export const INTENSITIES = {
-  calm: {
-    label: 'Calm',
-    note: 'Busy, but you can read every print.',
-    spawnMs: [850, 2000], burstChance: 0.16, burstSize: [2, 4], repeatChance: 0.1
-  },
-  normal: {
-    label: 'Normal',
-    note: 'Fast, and it comes in waves.',
-    spawnMs: [420, 1200], burstChance: 0.26, burstSize: [2, 5], repeatChance: 0.14
-  },
-  storm: {
-    label: 'Storm',
-    note: 'The tape will beat you. Take what you can.',
-    spawnMs: [170, 640], burstChance: 0.4, burstSize: [3, 7], repeatChance: 0.18
-  }
-};
+export const MODE_PACE = { ticker: 1, phonetic: 3.5, mixed: 2.25 };
+
+/** A word for each end of the dial, so the number is not the only cue. */
+const SPEED_WORDS = ['Walk', 'Walk', 'Steady', 'Steady', 'Brisk', 'Brisk', 'Heavy', 'Heavy', 'Storm', 'Storm'];
+
+export function clampSpeed(speed) {
+  const n = Math.round(Number(speed));
+  if (!Number.isFinite(n)) return SPEED_DEFAULT;
+  return Math.min(SPEED_MAX, Math.max(SPEED_MIN, n));
+}
+
+export function speedWord(speed) {
+  return SPEED_WORDS[clampSpeed(speed) - 1];
+}
+
+/**
+ * The gap we want between arrivals on average, before bursts are accounted
+ * for. Geometric rather than linear, so each step up the dial feels like the
+ * same jump in pressure.
+ */
+export function targetGapMs(speed, mode = 'ticker') {
+  const level = clampSpeed(speed);
+  const ratio = (level - SPEED_MIN) / (SPEED_MAX - SPEED_MIN);
+  const base = GAP_AT_SLOWEST * (GAP_AT_FASTEST / GAP_AT_SLOWEST) ** ratio;
+  return base * (MODE_PACE[mode] ?? 1);
+}
+
+/** How clumpy the tape is at a given level. Busier settings burst harder. */
+function burstShape(level) {
+  const step = (level - SPEED_MIN) / (SPEED_MAX - SPEED_MIN);
+  return {
+    burstChance: 0.12 + step * 0.3,
+    burstSize: [2, 3 + Math.round(step * 4)],
+    repeatChance: 0.1 + step * 0.08
+  };
+}
+
+/**
+ * The gap actually seen over a long run, which is not the base gap: arrivals
+ * inside a burst come at BURST_GAP_MS instead, and busier settings spend more
+ * of their time inside one.
+ *
+ * With p the chance of starting a burst and N its mean length, a share
+ * f = 1 / (1 + p(N-1)) of arrivals are the ones that get to roll; the rest are
+ * mid-burst and always take a burst gap.
+ */
+export function meanGapFor(baseGap, shape) {
+  const meanSize = (shape.burstSize[0] + shape.burstSize[1] + 1) / 2;
+  const rolls = 1 / (1 + shape.burstChance * (meanSize - 1));
+  return (1 - rolls) * BURST_GAP_MEAN
+    + rolls * (shape.burstChance * BURST_GAP_MEAN + (1 - shape.burstChance) * baseGap);
+}
+
+/** Invert the above, so the base gap lands the long-run mean on the target. */
+function baseGapForTarget(target, shape) {
+  const meanSize = (shape.burstSize[0] + shape.burstSize[1] + 1) / 2;
+  const rolls = 1 / (1 + shape.burstChance * (meanSize - 1));
+  const fromBursts = (1 - rolls) * BURST_GAP_MEAN + rolls * shape.burstChance * BURST_GAP_MEAN;
+  const share = rolls * (1 - shape.burstChance);
+  return Math.max(BURST_GAP_MEAN, (target - fromBursts) / share);
+}
+
+/** The base gap for a speed, with the mode adjustment applied. */
+export function baseGapMs(speed, mode = 'ticker') {
+  const level = clampSpeed(speed);
+  return Math.round(baseGapForTarget(targetGapMs(level, mode), burstShape(level)));
+}
+
+/** Everything the tape needs to know about how fast to run. */
+export function paceFor(speed, mode = 'ticker') {
+  const level = clampSpeed(speed);
+  const shape = burstShape(level);
+  const base = baseGapForTarget(targetGapMs(level, mode), shape);
+  return {
+    // Spread around the mean so arrivals stay irregular at every setting.
+    gapMs: [base * 0.6, base * 1.4],
+    ...shape
+  };
+}
+
+/**
+ * How long a print stays on the column, in seconds. This is the number the
+ * setup screen shows, so it has to be the real one - bursts included.
+ */
+export function columnSeconds(speed, mode = 'ticker') {
+  return Math.round((TAPE_ROWS * targetGapMs(speed, mode)) / 1000);
+}
+
+/** Old saved settings used three named presets. */
+const LEGACY_INTENSITY = { calm: 3, normal: 5, storm: 8 };
+
+/** Accept either a 1-10 speed or one of the old preset names. */
+export function toSpeed(value) {
+  if (typeof value === 'string' && LEGACY_INTENSITY[value]) return LEGACY_INTENSITY[value];
+  return clampSpeed(value ?? SPEED_DEFAULT);
+}
 
 const DEFAULTS = {
   mode: 'ticker',
-  intensity: 'normal',
+  speed: SPEED_DEFAULT,
   durationMs: 120000,
   listName: 'Custom',
   now: () => Date.now(),
@@ -55,8 +150,8 @@ export class TapeSession {
     const config = { ...DEFAULTS, ...options };
     this.tickers = [...tickers];
     this.mode = config.mode;
-    this.intensity = config.intensity;
-    this.tuning = INTENSITIES[config.intensity] ?? INTENSITIES.normal;
+    this.speed = toSpeed(config.speed);
+    this.tuning = paceFor(this.speed, config.mode);
     this.durationMs = config.durationMs;
     this.listName = config.listName;
     this.now = config.now;
@@ -230,7 +325,7 @@ export class TapeSession {
           this.burstRemaining = Math.max(0, size - 1);
           this.nextSpawnAt = at + this.#between(...BURST_GAP_MS);
         } else {
-          this.nextSpawnAt = at + this.#between(...this.tuning.spawnMs);
+          this.nextSpawnAt = at + this.#between(...this.tuning.gapMs);
         }
       }
     }
@@ -349,10 +444,11 @@ export class TapeSession {
     return {
       id: `${this.startedAt ?? Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       style: 'tape',
-      intensity: this.intensity,
       startedAt: this.startedAt,
       endedAt: this.endedAt ?? this.now(),
       mode: this.mode,
+      speed: this.speed,
+      columnSeconds: columnSeconds(this.speed, this.mode),
       listName: this.listName,
       // The length the run was set up for, not the elapsed time, so a run
       // ended early still records the contest it was started for.

@@ -1,7 +1,7 @@
 // UI wiring. All scoring lives in engine.js; all aggregation in stats.js.
 
 import { MODES, Session } from './engine.js';
-import { INTENSITIES, TAPE_ROWS, TapeSession } from './tape.js';
+import { TAPE_ROWS, TapeSession, columnSeconds, speedWord, toSpeed } from './tape.js';
 import { PRESETS, parseTickers } from './tickers.js';
 import { store } from './storage.js';
 import { overallStats, progressSeries, tickerStats, trend, weakTickers } from './stats.js';
@@ -143,9 +143,10 @@ function renderIdleNote() {
     $('idle-note').textContent = 'Add some symbols on the Setup tab first.';
   } else if (tape) {
     const minutes = Math.round((state.settings.durationMs ?? 120000) / 60000);
-    const speed = INTENSITIES[state.settings.intensity ?? 'normal'].label.toLowerCase();
+    const speed = toSpeed(state.settings.speed);
     $('idle-note').textContent =
-      `${minutes} min on the ${speed} tape, ${state.tickers.length} symbols, ${mode.toLowerCase()} mode.`;
+      `${minutes} min at speed ${speed}, ${state.tickers.length} symbols, ${mode.toLowerCase()} mode — `
+      + `about ${columnSeconds(speed, state.settings.mode)}s to take each print.`;
   } else {
     const count = state.settings.length || state.tickers.length;
     $('idle-note').textContent =
@@ -154,7 +155,7 @@ function renderIdleNote() {
 
   $('run-list').textContent = currentListName();
   $('run-mode').textContent = tape
-    ? `${mode} · ${INTENSITIES[state.settings.intensity ?? 'normal'].label} tape`
+    ? `${mode} · speed ${toSpeed(state.settings.speed)}`
     : mode;
   $('run-counter').textContent = tape
     ? '0 taken'
@@ -167,7 +168,7 @@ function renderIdleNote() {
 function syncSettingsUI() {
   const { mode, length, order, strict } = state.settings;
   const style = state.settings.style ?? 'tape';
-  const intensity = state.settings.intensity ?? 'normal';
+  const speed = toSpeed(state.settings.speed);
   const durationMs = state.settings.durationMs ?? 120000;
 
   for (const button of $('style-picker').children) {
@@ -179,9 +180,6 @@ function syncSettingsUI() {
   for (const button of $('length-picker').children) {
     button.classList.toggle('is-active', Number(button.dataset.length) === Number(length));
   }
-  for (const button of $('intensity-picker').children) {
-    button.classList.toggle('is-active', button.dataset.intensity === intensity);
-  }
   for (const button of $('duration-picker').children) {
     button.classList.toggle('is-active', Number(button.dataset.duration) === Number(durationMs));
   }
@@ -191,7 +189,11 @@ function syncSettingsUI() {
   $('style-note').textContent = style === 'tape'
     ? 'Symbols surface at the bottom and rise. Take them before they reach the top.'
     : 'One symbol at a time. Answer it, press Enter, get the next.';
-  $('intensity-note').textContent = INTENSITIES[intensity].note;
+  $('speed-slider').value = String(speed);
+  $('speed-value').textContent = String(speed);
+  $('speed-note').textContent =
+    `${speedWord(speed)} — a print stays on the column about `
+    + `${columnSeconds(speed, mode)}s in ${mode} mode.`;
 
   $('order-toggle').checked = order !== 'sequential';
   $('strict-toggle').checked = Boolean(strict);
@@ -345,7 +347,7 @@ function startTape(tickers) {
   stopTape();
   state.tape = new TapeSession(tickers, {
     mode: state.settings.mode,
-    intensity: state.settings.intensity ?? 'normal',
+    speed: toSpeed(state.settings.speed),
     durationMs: state.settings.durationMs ?? 120000,
     listName: currentListName()
   }).start();
@@ -851,10 +853,8 @@ function wire() {
     syncSettingsUI();
   });
 
-  on($('intensity-picker'), 'click', (event) => {
-    const button = event.target.closest('button');
-    if (!button) return;
-    state.settings = store.saveSettings({ intensity: button.dataset.intensity });
+  on($('speed-slider'), 'input', (event) => {
+    state.settings = store.saveSettings({ speed: toSpeed(event.target.value) });
     syncSettingsUI();
   });
 

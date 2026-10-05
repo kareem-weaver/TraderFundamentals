@@ -488,3 +488,31 @@ main { max-width: 1060px; margin: 0 auto; padding: 24px 16px 64px; }
   .tape { height: clamp(300px, 46vh, 420px); }
   .print { font-size: 12.5px; }
 }
+
+/* ── Speed dial ─────────────────────────────────────────────────────────── */
+.speed-row { display: flex; align-items: center; gap: 14px; }
+
+.speed-row input[type="range"] {
+  flex: 1;
+  accent-color: var(--series-1);
+  height: 22px;
+  cursor: pointer;
+}
+
+.speed-value {
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  min-width: 2.2ch;
+  text-align: right;
+  color: var(--series-1);
+}
+
+.speed-scale {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--text-muted);
+}

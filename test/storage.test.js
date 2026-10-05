@@ -107,3 +107,22 @@ test('clear wipes everything', () => {
   assert.deepEqual(store.sessions(), []);
   assert.deepEqual(store.lists(), []);
 });
+
+test('an old settings blob with a named intensity becomes a speed', () => {
+  localStorage.setItem('traderfundamentals.v1', JSON.stringify({
+    version: 1, sessions: [], lists: [],
+    settings: { mode: 'ticker', intensity: 'storm', durationMs: 60000 }
+  }));
+  const settings = store.settings();
+  assert.equal(settings.speed, 8, 'storm maps to 8');
+  assert.equal(settings.intensity, undefined, 'and the old key is dropped');
+  assert.equal(settings.durationMs, 60000, 'everything else survives');
+});
+
+test('migration leaves a speed that is already set alone', () => {
+  localStorage.setItem('traderfundamentals.v1', JSON.stringify({
+    version: 1, sessions: [], lists: [],
+    settings: { speed: 2, intensity: 'storm' }
+  }));
+  assert.equal(store.settings().speed, 2);
+});

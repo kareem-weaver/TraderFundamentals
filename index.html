@@ -188,12 +188,14 @@
 
         <div id="tape-settings">
           <h3 class="spaced">Tape speed</h3>
-          <div class="segmented wide" id="intensity-picker" role="group" aria-label="Tape speed">
-            <button data-intensity="calm">Calm</button>
-            <button data-intensity="normal" class="is-active">Normal</button>
-            <button data-intensity="storm">Storm</button>
+          <div class="speed-row">
+            <input type="range" id="speed-slider" min="1" max="10" step="1" value="5"
+                   aria-label="Tape speed, 1 slowest to 10 fastest"
+                   aria-describedby="speed-note" />
+            <output class="speed-value" id="speed-value" for="speed-slider">5</output>
           </div>
-          <p class="field-note" id="intensity-note">Steady, with the odd flurry.</p>
+          <div class="speed-scale"><span>1 · slowest</span><span>10 · fastest</span></div>
+          <p class="field-note" id="speed-note"></p>
 
           <h3 class="spaced">Run time</h3>
           <div class="segmented wide" id="duration-picker" role="group" aria-label="Run time">

@@ -91,6 +91,36 @@ too: `alpha` for `alfa`, `juliet` for `juliett`, `x-ray` for `xray`, `nine` for
 Separators are optional — `BRK.B` accepts both `bravo romeo kilo point bravo`
 and `bravo romeo kilo bravo`. Spacing and capitalisation never matter.
 
+## Sector drill
+
+`sector-drill.html` is a separate, self-contained trainer that sits next to the
+ticker drill.
+
+Sector drill: learn which sector and subsector ~110 anchor stocks belong to.
+Modes: ticker to sector (hotkeys <kbd>1</kbd>–<kbd>9</kbd>, <kbd>0</kbd>,
+<kbd>-</kbd>), ticker to subsector, name them (type tickers in a sector against
+a 25s timer), and pick the peers (select names that move with a ticker).
+Includes a Study map tab with classification traps (`V`/`MA` in Financials,
+`UBER` in Industrials, `GOOGL`/`META` in Comm Services, data-center REITs in
+Real Estate) and cross-sector themes.
+
+Misses are saved in this browser's `localStorage` under `sectorDrill.v1` and
+weight later sessions toward the names you get wrong. The Study map shows your
+miss counts and can reset them.
+
+**Adding a name.** The deck is a pipe-delimited block near the top of the
+script — one line per stock:
+
+```
+ticker|company|sector|subsector|note|themes
+UBER|Uber|ind|Transportation|Moved from Tech to Industrials (ground transportation) in 2023.|
+```
+
+`sector` is one of the keys in the `SECTORS` array just above it (`tech`,
+`comm`, `disc`, `stap`, `hc`, `fin`, `ind`, `en`, `mat`, `util`, `re`). `note`
+and `themes` are optional; themes are comma-separated. A new subsector name
+creates a new subsector automatically.
+
 ## Running it
 
 It is a static site with no dependencies and no build step. ES modules will not
@@ -99,6 +129,12 @@ load over `file://`, so serve the folder:
 ```bash
 npm start          # http://localhost:8080
 ```
+
+The sector drill has no modules, so it also opens straight from disk — double-click
+`sector-drill.html`. The only external request is its Google Fonts stylesheet,
+and it falls back to system fonts offline. When the folder is served (locally or
+on Pages) it is at `/sector-drill.html`, and the ticker drill's top bar links to
+it.
 
 Tests are plain `node:test`, no install required:
 
@@ -147,6 +183,7 @@ src/storage.js      localStorage, export/import, merge
 src/chart.js        inline-SVG progress charts
 src/github.js       optional gist sync
 src/app.js          UI wiring
+sector-drill.html   the sector drill, self-contained (inline CSS, JS and deck data)
 test/               node:test suites for everything above
 ```
 

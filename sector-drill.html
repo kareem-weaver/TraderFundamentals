@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Sector Drill</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF1F4; --panel:#FFFFFF; --ink:#16202C; --muted:#5B6776; --line:#D5DBE2;
+  --ok:#1E8E4E; --bad:#C8372D; --focus:#2F6FDB;
+  --font:"Archivo", "Helvetica Neue", Arial, sans-serif;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#10161E; --panel:#18212C; --ink:#E6EBF1; --muted:#93A0AF; --line:#2A3542; --ok:#3CC47A; --bad:#F0655A; --focus:#7FA8F0; }
+}
+*,*::before,*::after{box-sizing:inherit}
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font);font-size:16px;line-height:1.45}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.wrap{max-width:960px;margin:0 auto;padding:20px 20px 60px}
+
+header{display:flex;align-items:baseline;justify-content:space-between;gap:16px;flex-wrap:wrap;margin-bottom:18px}
+h1{margin:0;font-size:28px;font-weight:800;font-stretch:112%;letter-spacing:-.01em}
+h1 small{font-size:15px;font-weight:500;font-stretch:100%;color:var(--muted);margin-left:10px;letter-spacing:0}
+.tabs{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:3px}
+.tabs button{border:0;background:none;padding:6px 14px;border-radius:7px;font-weight:600;color:var(--muted)}
+.tabs button[aria-pressed="true"]{background:var(--ink);color:var(--bg)}
+
+.controls{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:grid;gap:12px;margin-bottom:18px}
+.row{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center}
+.lbl{font-size:14px;color:var(--muted);min-width:64px}
+.seg{display:flex;gap:4px;flex-wrap:wrap}
+.seg button{border:1px solid var(--line);background:none;padding:5px 12px;border-radius:7px;font-size:14px;font-weight:600}
+.seg button[aria-pressed="true"]{border-color:var(--ink);background:var(--ink);color:var(--bg)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:none;padding:4px 10px 4px 8px;border-radius:999px;font-size:13px;font-weight:600;display:inline-flex;align-items:center;gap:6px;opacity:.45}
+.chip::before{content:"";width:9px;height:9px;border-radius:50%;background:var(--c)}
+.chip[aria-pressed="true"]{opacity:1;border-color:var(--c)}
+.linkbtn{border:0;background:none;padding:2px 4px;color:var(--muted);font-size:13px;text-decoration:underline}
+label.tog{display:inline-flex;gap:6px;align-items:center;font-size:14px}
+.startbtn{margin-left:auto;border:0;background:var(--ink);color:var(--bg);font-weight:700;padding:8px 18px;border-radius:8px}
+
+.stats{display:flex;gap:22px;flex-wrap:wrap;font-size:14px;color:var(--muted);margin:0 2px 10px}
+.stats b{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
+
+.stage{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:28px 22px 24px;min-height:420px}
+.prompt{text-align:center;margin-bottom:22px}
+.ask{font-size:15px;color:var(--muted);margin-bottom:4px}
+.tk{display:inline-block;font-size:clamp(56px,11vw,104px);font-weight:800;font-stretch:125%;letter-spacing:.01em;line-height:1;padding-bottom:10px;
+    background:linear-gradient(var(--c,transparent),var(--c,transparent)) left bottom/0% 8px no-repeat;transition:background-size .35s ease}
+.tk.small{font-size:clamp(30px,6vw,52px);font-stretch:110%}
+.tk.revealed{background-size:100% 8px}
+.co{font-size:17px;color:var(--muted);min-height:1.45em;margin-top:6px}
+
+.grid{display:grid;gap:8px}
+.grid.sectors{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}
+.grid.subs{grid-template-columns:repeat(auto-fill,minmax(200px,1fr))}
+.grid.peers{grid-template-columns:repeat(4,1fr)}
+@media (max-width:560px){.grid.peers{grid-template-columns:repeat(2,1fr)}}
+.ans{position:relative;text-align:left;border:1px solid var(--line);background:var(--bg);border-radius:9px;padding:10px 12px 10px 18px;display:flex;flex-direction:column;gap:1px;min-height:58px}
+.ans::before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;border-radius:9px 0 0 9px;background:var(--c,var(--line))}
+.ans .nm{font-weight:700}
+.ans .etf{font-size:13px;color:var(--muted)}
+.ans kbd{position:absolute;right:9px;top:8px;font-family:var(--font);font-size:12px;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 5px}
+.ans:hover:not(:disabled){border-color:var(--c,var(--ink))}
+.ans:disabled{cursor:default}
+.ans.right{border-color:var(--ok);box-shadow:inset 0 0 0 2px var(--ok)}
+.ans.wrong{border-color:var(--bad);box-shadow:inset 0 0 0 2px var(--bad)}
+.ans.missed{border-style:dashed;border-color:var(--ok);box-shadow:inset 0 0 0 1px var(--ok)}
+.ans.sel{border-color:var(--ink);box-shadow:inset 0 0 0 2px var(--ink)}
+.ans.peer{align-items:flex-start;padding-left:12px}
+.ans.peer::before{display:none}
+.ans.peer .nm{font-size:20px;font-stretch:115%}
+
+.fb{min-height:74px;margin-top:18px;text-align:center}
+.fb .line{font-size:17px}
+.fb .note{margin:8px auto 0;max-width:62ch;font-size:15px;color:var(--muted)}
+.fb .cont{margin-top:10px;font-size:13px;color:var(--muted)}
+.ok{color:var(--ok);font-weight:700}
+.bad{color:var(--bad);font-weight:700}
+.tag{display:inline-block;font-size:12px;font-weight:600;border:1px solid var(--line);border-radius:4px;padding:0 6px;margin-left:4px;color:var(--muted)}
+
+.checkrow{display:flex;justify-content:center;margin-top:16px}
+.btn{border:1px solid var(--ink);background:var(--ink);color:var(--bg);font-weight:700;padding:8px 18px;border-radius:8px}
+.btn.ghost{background:none;color:var(--ink)}
+
+.timer{height:4px;background:var(--line);border-radius:4px;overflow:hidden;max-width:420px;margin:0 auto 16px}
+.timer i{display:block;height:100%;background:var(--ink);width:100%}
+.namebox{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.namebox input{width:min(280px,100%);font-size:24px;font-weight:700;font-stretch:115%;text-transform:uppercase;text-align:center;border:1px solid var(--line);background:var(--bg);border-radius:9px;padding:8px 12px}
+.found{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:14px;min-height:34px}
+.pill{border:1px solid var(--line);border-radius:7px;padding:3px 9px;font-weight:700;font-size:15px}
+.pill.got{border-color:var(--ok);color:var(--ok)}
+.pill span{font-weight:500;color:var(--muted);font-size:13px;margin-left:5px}
+.msg{min-height:22px;text-align:center;font-size:15px;margin-top:8px}
+
+.intro{max-width:60ch;margin:10px auto;text-align:left}
+.intro h2{font-size:22px;margin:0 0 8px;font-stretch:110%}
+.intro p{margin:0 0 10px;color:var(--muted)}
+.intro .btn{margin-top:6px}
+
+.summary h2{font-size:24px;margin:0 0 4px;font-stretch:110%}
+.sumnums{display:flex;gap:28px;flex-wrap:wrap;margin:14px 0 18px}
+.sumnums div{font-size:14px;color:var(--muted)}
+.sumnums b{display:block;font-size:30px;color:var(--ink);font-stretch:115%}
+.misslist{list-style:none;padding:0;margin:0 0 18px;border-top:1px solid var(--line)}
+.misslist li{padding:8px 0;border-bottom:1px solid var(--line);display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}
+.misslist .t{font-weight:800;font-stretch:115%;min-width:64px}
+.misslist .dot{width:9px;height:9px;border-radius:50%;background:var(--c);display:inline-block;margin-right:4px}
+.btnrow{display:flex;gap:10px;flex-wrap:wrap}
+
+/* Study map */
+.map{display:grid;gap:14px}
+.sec{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.sec h2{margin:0;padding:12px 16px;font-size:19px;display:flex;align-items:baseline;gap:10px;border-left:8px solid var(--c)}
+.sec h2 .etf{font-size:14px;color:var(--muted);font-weight:600}
+.subgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:4px 20px;padding:4px 16px 14px 24px}
+.sub h3{margin:10px 0 4px;font-size:14px;color:var(--muted);font-weight:600}
+.co-row{padding:3px 0;font-size:15px}
+.co-row .t{font-weight:800;font-stretch:115%;display:inline-block;min-width:62px}
+.co-row .n{color:var(--ink)}
+.co-row .note{display:block;font-size:13px;color:var(--muted);padding-left:62px;line-height:1.35}
+.co-row .miss{font-size:12px;color:var(--bad);margin-left:6px}
+.gotcha{box-shadow:inset 0 -3px 0 var(--c)}
+.themes{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+.themes h2{margin:0 0 4px;font-size:19px}
+.themes p{margin:0 0 10px;color:var(--muted);font-size:15px}
+.themes dl{margin:0;display:grid;grid-template-columns:max-content 1fr;gap:6px 16px}
+.themes dt{font-weight:700}
+.themes dd{margin:0}
+.maptools{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px;color:var(--muted);font-size:14px}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){.tk{transition:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Sector drill<small id="count"></small></h1>
+    <div class="tabs" role="group" aria-label="View">
+      <button id="vDrill" aria-pressed="true">Drill</button>
+      <button id="vMap" aria-pressed="false">Study map</button>
+    </div>
+  </header>
+
+  <section id="drillView">
+    <div class="controls">
+      <div class="row"><span class="lbl">Mode</span>
+        <div class="seg" id="modes"></div>
+      </div>
+      <div class="row"><span class="lbl">Sectors</span>
+        <div class="chips" id="chips"></div>
+        <button class="linkbtn" id="allS">All</button><button class="linkbtn" id="noneS">None</button>
+      </div>
+      <div class="row"><span class="lbl">Cards</span>
+        <div class="seg" id="lens"></div>
+        <label class="tog"><input type="checkbox" id="showNames" checked> Show company names</label>
+        <button class="startbtn" id="startBtn">Start</button>
+      </div>
+    </div>
+    <div class="stats" id="stats"></div>
+    <div class="stage" id="stage"></div>
+  </section>
+
+  <section id="mapView" hidden></section>
+</div>
+
+<script>
+/* ============================================================
+   DECK DATA — ticker | company | sector key | subsector | gotcha note | themes
+   Subsectors are practical groupings built from GICS industries.
+   Exposed as window.SECTOR_DECK so other drills (e.g. ticker-drill) can reuse it.
+   ============================================================ */
+const SECTORS = [
+  {k:'tech', name:'Information Technology', short:'Tech',          etf:'XLK',  c:'#2F6FDB'},
+  {k:'comm', name:'Communication Services', short:'Comm Services', etf:'XLC',  c:'#8A4FD6'},
+  {k:'disc', name:'Consumer Discretionary', short:'Discretionary', etf:'XLY',  c:'#E0662B'},
+  {k:'stap', name:'Consumer Staples',       short:'Staples',       etf:'XLP',  c:'#3E9A55'},
+  {k:'hc',   name:'Health Care',            short:'Health Care',   etf:'XLV',  c:'#D6336C'},
+  {k:'fin',  name:'Financials',             short:'Financials',    etf:'XLF',  c:'#1F8A8A'},
+  {k:'ind',  name:'Industrials',            short:'Industrials',   etf:'XLI',  c:'#5B6B7F'},
+  {k:'en',   name:'Energy',                 short:'Energy',        etf:'XLE',  c:'#B42318'},
+  {k:'mat',  name:'Materials',              short:'Materials',     etf:'XLB',  c:'#7A8B2E'},
+  {k:'util', name:'Utilities',              short:'Utilities',     etf:'XLU',  c:'#D4A72C'},
+  {k:'re',   name:'Real Estate',            short:'Real Estate',   etf:'XLRE', c:'#8E5B3E'}
+];
+const RAW = `
+NVDA|Nvidia|tech|Semiconductors||AI
+AMD|Advanced Micro Devices|tech|Semiconductors||AI
+AVGO|Broadcom|tech|Semiconductors||AI
+MU|Micron|tech|Semiconductors|Memory chips; moves with DRAM/HBM pricing.|AI
+AMAT|Applied Materials|tech|Semi equipment|Sells the machines that make chips.|
+LRCX|Lam Research|tech|Semi equipment||
+MSFT|Microsoft|tech|Software||AI
+ORCL|Oracle|tech|Software||AI
+CRM|Salesforce|tech|Software||
+PLTR|Palantir|tech|Software||AI
+AAPL|Apple|tech|Hardware & networking||
+ANET|Arista Networks|tech|Hardware & networking|Data-center networking gear.|AI
+DELL|Dell Technologies|tech|Hardware & networking||AI
+IBM|IBM|tech|IT services||
+GOOGL|Alphabet|comm|Interactive media|Search and ads put Alphabet in Communication Services, not Tech (2018 GICS change).|AI
+META|Meta Platforms|comm|Interactive media|Social media is Communication Services, not Tech (2018 GICS change).|AI
+RDDT|Reddit|comm|Interactive media||
+NFLX|Netflix|comm|Entertainment|Streaming counts as Entertainment in Communication Services.|
+DIS|Disney|comm|Entertainment||
+RBLX|Roblox|comm|Entertainment|Video games sit in Communication Services.|
+T|AT&T|comm|Telecom||
+VZ|Verizon|comm|Telecom||
+TMUS|T-Mobile US|comm|Telecom||
+CMCSA|Comcast|comm|Cable & media||
+CHTR|Charter Communications|comm|Cable & media||
+AMZN|Amazon|disc|Broadline retail|Retail is most of its revenue, so it's Consumer Discretionary even though AWS drives profit.|AI
+TSLA|Tesla|disc|Autos|Classified as an automaker: Consumer Discretionary, not Tech.|
+F|Ford|disc|Autos||
+GM|General Motors|disc|Autos||
+HD|Home Depot|disc|Home improvement retail||
+LOW|Lowe's|disc|Home improvement retail||
+MCD|McDonald's|disc|Restaurants|Restaurants are Discretionary, not Staples.|
+SBUX|Starbucks|disc|Restaurants||
+CMG|Chipotle|disc|Restaurants||
+NKE|Nike|disc|Apparel & footwear||
+BKNG|Booking Holdings|disc|Travel||
+WMT|Walmart|stap|Staples retail|Big-box grocers sit in Staples; Amazon sits in Discretionary.|
+COST|Costco|stap|Staples retail||
+TGT|Target|stap|Staples retail|Moved from Discretionary to Staples in the 2023 retail reshuffle.|
+PG|Procter & Gamble|stap|Household products||
+CL|Colgate-Palmolive|stap|Household products||
+KO|Coca-Cola|stap|Beverages||
+PEP|PepsiCo|stap|Beverages||
+MDLZ|Mondelez|stap|Packaged food||
+PM|Philip Morris|stap|Tobacco||
+MO|Altria|stap|Tobacco||
+LLY|Eli Lilly|hc|Pharma||GLP-1
+JNJ|Johnson & Johnson|hc|Pharma||
+MRK|Merck|hc|Pharma||
+PFE|Pfizer|hc|Pharma||
+AMGN|Amgen|hc|Biotech||
+VRTX|Vertex Pharmaceuticals|hc|Biotech|Classified as Biotech despite the name.|
+GILD|Gilead Sciences|hc|Biotech||
+UNH|UnitedHealth|hc|Managed care & services||
+CVS|CVS Health|hc|Managed care & services|Owns Aetna and pharmacies: Health Care, not retail.|
+ISRG|Intuitive Surgical|hc|Medical devices||
+ABT|Abbott Laboratories|hc|Medical devices||
+TMO|Thermo Fisher|hc|Life science tools||
+JPM|JPMorgan Chase|fin|Banks||
+BAC|Bank of America|fin|Banks||
+WFC|Wells Fargo|fin|Banks||
+GS|Goldman Sachs|fin|Investment banks & brokers||
+MS|Morgan Stanley|fin|Investment banks & brokers||
+HOOD|Robinhood|fin|Investment banks & brokers||Crypto
+V|Visa|fin|Payments|Moved from Tech to Financials in 2023.|
+MA|Mastercard|fin|Payments|Moved from Tech to Financials in 2023.|
+PYPL|PayPal|fin|Payments|Moved from Tech to Financials in 2023.|
+BRK.B|Berkshire Hathaway|fin|Asset managers, exchanges & holdings|A conglomerate, but classified as Financials.|
+BLK|BlackRock|fin|Asset managers, exchanges & holdings||
+COIN|Coinbase|fin|Asset managers, exchanges & holdings|An exchange, so Financials, not Tech.|Crypto
+GE|GE Aerospace|ind|Aerospace & defense|Jet engines; GE is Industrials.|
+BA|Boeing|ind|Aerospace & defense||
+RTX|RTX|ind|Aerospace & defense||Defense
+LMT|Lockheed Martin|ind|Aerospace & defense||Defense
+CAT|Caterpillar|ind|Machinery||
+DE|Deere|ind|Machinery||
+UNP|Union Pacific|ind|Transportation||
+UPS|UPS|ind|Transportation||
+UBER|Uber|ind|Transportation|Moved from Tech to Industrials (ground transportation) in 2023.|
+ETN|Eaton|ind|Electrical equipment|Power gear for data centers.|AI power
+GEV|GE Vernova|ind|Electrical equipment|Gas turbines and grid equipment.|AI power
+XOM|Exxon Mobil|en|Integrated oil||
+CVX|Chevron|en|Integrated oil||
+COP|ConocoPhillips|en|Exploration & production||
+OXY|Occidental Petroleum|en|Exploration & production||
+SLB|SLB|en|Oilfield services||
+HAL|Halliburton|en|Oilfield services||
+KMI|Kinder Morgan|en|Pipelines||
+WMB|Williams|en|Pipelines||
+VLO|Valero|en|Refiners||
+MPC|Marathon Petroleum|en|Refiners||
+LIN|Linde|mat|Chemicals & gases|Industrial gases: Materials.|
+SHW|Sherwin-Williams|mat|Chemicals & gases|Paint is a specialty chemical: Materials.|
+DOW|Dow|mat|Chemicals & gases||
+FCX|Freeport-McMoRan|mat|Metals & mining|Copper.|
+NEM|Newmont|mat|Metals & mining|Gold.|
+NUE|Nucor|mat|Metals & mining|Steel.|
+VMC|Vulcan Materials|mat|Construction materials & packaging||
+IP|International Paper|mat|Construction materials & packaging||
+NEE|NextEra Energy|util|Electric utilities||
+DUK|Duke Energy|util|Electric utilities||
+SO|Southern Company|util|Electric utilities||
+CEG|Constellation Energy|util|Power producers|Trades like an AI-power play, but it's a Utility.|AI power,Nuclear
+VST|Vistra|util|Power producers|Trades like an AI-power play, but it's a Utility.|AI power,Nuclear
+NRG|NRG Energy|util|Power producers||AI power
+PLD|Prologis|re|Industrial & retail REITs|Warehouses.|
+O|Realty Income|re|Industrial & retail REITs||
+SPG|Simon Property Group|re|Industrial & retail REITs|Malls.|
+AMT|American Tower|re|Towers & data centers|Cell towers are REITs: Real Estate, not Telecom.|
+EQIX|Equinix|re|Towers & data centers|Data centers are REITs: Real Estate, not Tech.|AI
+DLR|Digital Realty|re|Towers & data centers|Data centers are REITs: Real Estate, not Tech.|AI
+PSA|Public Storage|re|Specialty REITs & services||
+WELL|Welltower|re|Specialty REITs & services|Senior housing and medical buildings.|
+CBRE|CBRE Group|re|Specialty REITs & services|Real estate services, not a REIT.|
+`;
+const DATA = RAW.trim().split('\n').map(l=>{const [t,n,s,sub,note,th]=l.split('|');return {t,n,s,sub,note:note||'',themes:th?th.split(','):[]};});
+window.SECTOR_DECK = DATA;
+
+const SK = Object.fromEntries(SECTORS.map((s,i)=>[s.k,{...s,i}]));
+const HOTKEYS = ['1','2','3','4','5','6','7','8','9','0','-'];
+const SUBS = []; {const seen=new Set(); for(const d of DATA){const key=d.s+'|'+d.sub; if(!seen.has(key)){seen.add(key);SUBS.push({s:d.s,sub:d.sub});}}}
+const norm = s=>String(s).toUpperCase().replace(/[^A-Z0-9]/g,'');
+const TMAP = Object.fromEntries(DATA.map(d=>[norm(d.t),d]));
+const NAME_MS = 25000;
+const MODES = [
+  {k:'sector', label:'Ticker to sector'},
+  {k:'sub',    label:'Ticker to subsector'},
+  {k:'name',   label:'Name them'},
+  {k:'peers',  label:'Pick the peers'}
+];
+const LENS = ['20','40','all'];
+
+/* ---------- helpers ---------- */
+const $ = s=>document.querySelector(s);
+const esc = s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]];}return a;}
+const pick=(a,n)=>shuffle(a).slice(0,Math.max(0,n));
+const fmtMs = ms=>ms==null||isNaN(ms)?'—':(ms/1000).toFixed(2)+'s';
+
+/* ---------- progress (persists misses between sessions) ---------- */
+const KEY='sectorDrill.v1';
+let prog={};
+try{prog=JSON.parse(localStorage.getItem(KEY)||'{}')||{};}catch(e){prog={};}
+function saveProg(){try{localStorage.setItem(KEY,JSON.stringify(prog));}catch(e){}}
+function mark(t,ok){const p=prog[t]||(prog[t]={seen:0,miss:0});p.seen++;if(!ok)p.miss++;saveProg();}
+function weighted(pool,n){
+  return pool.map(d=>{const p=prog[d.t];const w=p?1+4*p.miss/(p.seen+1):1.5;return {d,k:Math.pow(Math.random(),1/w)};})
+    .sort((a,b)=>b.k-a.k).slice(0,n).map(x=>x.d);
+}
+
+/* ---------- state ---------- */
+const st={view:'drill',mode:'sector',len:'20',showNames:true,sectors:new Set(SECTORS.map(s=>s.k)),
+  queue:[],i:0,results:[],streak:0,best:0,phase:'idle',t0:0,timers:[],interval:null,peers:null,nm:null};
+const stage=$('#stage');
+
+/* ---------- controls ---------- */
+$('#count').textContent = DATA.length+' names, 11 sectors';
+function renderControls(){
+  $('#modes').innerHTML = MODES.map(m=>`<button data-m="${m.k}" aria-pressed="${st.mode===m.k}">${m.label}</button>`).join('');
+  $('#modes').querySelectorAll('button').forEach(b=>b.onclick=()=>{st.mode=b.dataset.m;renderControls();idle();});
+  $('#lens').innerHTML = LENS.map(l=>`<button data-l="${l}" aria-pressed="${st.len===l}">${l==='all'?'All':l}</button>`).join('');
+  $('#lens').querySelectorAll('button').forEach(b=>b.onclick=()=>{st.len=b.dataset.l;renderControls();idle();});
+  $('#chips').innerHTML = SECTORS.map(s=>`<button class="chip" style="--c:${s.c}" data-k="${s.k}" aria-pressed="${st.sectors.has(s.k)}">${s.short}</button>`).join('');
+  $('#chips').querySelectorAll('button').forEach(b=>b.onclick=()=>{const k=b.dataset.k;st.sectors.has(k)?st.sectors.delete(k):st.sectors.add(k);renderControls();idle();});
+}
+$('#allS').onclick=()=>{st.sectors=new Set(SECTORS.map(s=>s.k));renderControls();idle();};
+$('#noneS').onclick=()=>{st.sectors=new Set();renderControls();idle();};
+$('#showNames').onchange=e=>{st.showNames=e.target.checked;};
+$('#startBtn').onclick=()=>start();
+$('#vDrill').onclick=()=>setView('drill');
+$('#vMap').onclick=()=>setView('map');
+function setView(v){
+  st.view=v;
+  $('#vDrill').setAttribute('aria-pressed',v==='drill');$('#vMap').setAttribute('aria-pressed',v==='map');
+  $('#drillView').hidden=v!=='drill';$('#mapView').hidden=v!=='map';
+  if(v==='map'){clearTimers();renderMap();}
+  else if(st.phase==='ask'||st.phase==='fb'){idle();}
+}
+
+function clearTimers(){st.timers.forEach(clearTimeout);st.timers=[];if(st.interval){clearInterval(st.interval);st.interval=null;}}
+
+/* ---------- idle / intro ---------- */
+const INTROS={
+  sector:['Ticker to sector','A ticker appears. Press its sector key (1 to 9, 0, and the minus key) or click. Correct answers advance on their own; misses show the reason and come back a few cards later.'],
+  sub:['Ticker to subsector','Pick the right subsector from four choices (keys 1 to 4). Two of the wrong choices usually come from the same sector, so you have to know the group, not just the sector.'],
+  name:['Name them','You get a sector or subsector. Type tickers that belong to it and press Enter after each. You have 25 seconds. Esc reveals the answer.'],
+  peers:['Pick the peers','A ticker appears with eight others. Select the ones from its subsector (keys 1 to 8 or click), then press Enter to check. These are the names most likely to move with it.']
+};
+function idle(){
+  clearTimers();st.phase='idle';
+  const [h,p]=INTROS[st.mode];
+  const none=st.sectors.size===0;
+  stage.innerHTML=`<div class="intro"><h2>${h}</h2><p>${p}</p>
+    ${none?'<p class="bad">Select at least one sector above to start.</p>':`<button class="btn" id="goBtn">Start (Enter)</button>`}</div>`;
+  const g=$('#goBtn'); if(g) g.onclick=()=>start();
+  updStats();
+}
+
+/* ---------- session ---------- */
+function poolT(){return DATA.filter(d=>st.sectors.has(d.s));}
+function namePrompts(){
+  const out=[];
+  for(const s of SECTORS){ if(!st.sectors.has(s.k)) continue;
+    const inS=DATA.filter(d=>d.s===s.k);
+    out.push({label:s.name,sector:s.k,sub:null,set:inS.map(d=>d.t),need:3});
+    for(const sub of [...new Set(inS.map(d=>d.sub))]){
+      const m=inS.filter(d=>d.sub===sub);
+      if(m.length>=2) out.push({label:sub,sector:s.k,sub,set:m.map(d=>d.t),need:2});
+    }
+  }
+  return out;
+}
+function start(items){
+  if(st.sectors.size===0&&!items){idle();return;}
+  clearTimers();
+  st.results=[];st.i=0;st.streak=0;st.best=0;
+  if(items){st.queue=shuffle(items).map(v=>({v,re:0}));}
+  else{
+    const n=st.len==='all'?Infinity:+st.len;
+    if(st.mode==='name'){const ps=namePrompts();st.queue=shuffle(ps).slice(0,Math.min(n,ps.length)).map(v=>({v,re:0}));}
+    else{const pool=poolT();st.queue=weighted(pool,Math.min(n,pool.length)).map(v=>({v,re:0}));}
+  }
+  show();
+}
+function show(){
+  clearTimers();
+  if(document.activeElement&&document.activeElement!==document.body) document.activeElement.blur();
+  if(st.i>=st.queue.length) return finish();
+  st.phase='ask';st.t0=performance.now();
+  const q=st.queue[st.i];
+  ({sector:askSector,sub:askSub,name:askName,peers:askPeers})[st.mode](q);
+  updStats();
+}
+function next(){st.i++;show();}
+function record(ok,given){
+  const q=st.queue[st.i];
+  st.results.push({q,ok,ms:performance.now()-st.t0,given});
+  if(ok){st.streak++;st.best=Math.max(st.best,st.streak);}else st.streak=0;
+  if(!ok&&q.re<1) st.queue.splice(Math.min(st.i+4,st.queue.length),0,{v:q.v,re:q.re+1});
+  st.phase='fb';updStats();
+}
+function updStats(){
+  const r=st.results, n=r.length, ok=r.filter(x=>x.ok).length;
+  const oks=r.filter(x=>x.ok), avg=oks.length?oks.reduce((a,x)=>a+x.ms,0)/oks.length:null;
+  const total=st.queue.length;
+  $('#stats').innerHTML = st.phase==='idle'?'' :
+    `<span>Card <b>${Math.min(st.i+1,total)}/${total}</b></span><span>Accuracy <b>${n?Math.round(100*ok/n)+'%':'—'}</b></span><span>Streak <b>${st.streak}</b></span><span>Avg correct <b>${fmtMs(avg)}</b></span>`;
+}
+function tickerHead(d,ask){
+  return `<div class="prompt">${ask?`<div class="ask">${ask}</div>`:''}<div class="tk" id="tk" style="--c:${SK[d.s].c}">${esc(d.t)}</div><div class="co">${st.showNames?esc(d.n):'&nbsp;'}</div></div>`;
+}
+function revealTicker(d){const tk=$('#tk');if(tk){tk.classList.add('revealed');} const co=stage.querySelector('.co'); if(co) co.textContent=d.n;}
+function fbHTML(d,ok,extra){
+  const s=SK[d.s];
+  const themes=d.themes.map(t=>`<span class="tag">${esc(t)}</span>`).join('');
+  return `<div class="line"><span class="${ok?'ok':'bad'}">${ok?'Correct.':'Not quite.'}</span> ${esc(d.n)} is ${esc(s.name)} / ${esc(d.sub)} ${themes}</div>
+    ${extra||''}${d.note?`<div class="note">${esc(d.note)}</div>`:''}
+    <div class="cont">${ok?'':'Press Enter to continue'}</div>`;
+}
+function afterAnswer(d,ok){
+  revealTicker(d);
+  if(ok){st.timers.push(setTimeout(next,d.note?1700:450));const c=stage.querySelector('.cont');if(c&&d.note)c.textContent='Enter to skip';}
+}
+
+/* ---------- mode: ticker to sector ---------- */
+function askSector(q){
+  const d=q.v;
+  stage.innerHTML = tickerHead(d) +
+    `<div class="grid sectors">${SECTORS.map((s,i)=>`<button class="ans" data-k="${s.k}" style="--c:${s.c}"><kbd>${HOTKEYS[i]}</kbd><span class="nm">${s.short}</span><span class="etf">${s.etf}</span></button>`).join('')}</div><div class="fb" id="fb"></div>`;
+  stage.querySelectorAll('.ans').forEach(b=>b.onclick=()=>answerSector(b.dataset.k));
+}
+function answerSector(k){
+  if(st.phase!=='ask')return;
+  const d=st.queue[st.i].v, ok=k===d.s;
+  stage.querySelectorAll('.ans').forEach(b=>{if(b.dataset.k===d.s)b.classList.add('right');else if(b.dataset.k===k)b.classList.add('wrong');b.disabled=true;});
+  record(ok,SK[k].short);mark(d.t,ok);
+  $('#fb').innerHTML=fbHTML(d,ok, ok?'':`<div class="note">You picked ${esc(SK[k].name)}.</div>`);
+  afterAnswer(d,ok);
+}
+
+/* ---------- mode: ticker to subsector ---------- */
+function askSub(q){
+  const d=q.v;
+  const same=pick(SUBS.filter(x=>x.s===d.s&&x.sub!==d.sub),2);
+  const other=pick(SUBS.filter(x=>x.s!==d.s),3-same.length);
+  const opts=shuffle([{s:d.s,sub:d.sub},...same,...other]);
+  st.subOpts=opts;
+  stage.innerHTML = tickerHead(d) +
+    `<div class="grid subs">${opts.map((o,i)=>`<button class="ans" data-i="${i}" style="--c:${SK[o.s].c}"><kbd>${i+1}</kbd><span class="nm">${esc(o.sub)}</span><span class="etf">${SK[o.s].short}</span></button>`).join('')}</div><div class="fb" id="fb"></div>`;
+  stage.querySelectorAll('.ans').forEach(b=>b.onclick=()=>answerSub(+b.dataset.i));
+}
+function answerSub(i){
+  if(st.phase!=='ask'||!st.subOpts[i])return;
+  const d=st.queue[st.i].v, o=st.subOpts[i], ok=o.s===d.s&&o.sub===d.sub;
+  stage.querySelectorAll('.ans').forEach((b,j)=>{const x=st.subOpts[j];if(x.s===d.s&&x.sub===d.sub)b.classList.add('right');else if(j===i)b.classList.add('wrong');b.disabled=true;});
+  record(ok,o.sub);mark(d.t,ok);
+  $('#fb').innerHTML=fbHTML(d,ok);
+  afterAnswer(d,ok);
+}
+
+/* ---------- mode: pick the peers ---------- */
+function askPeers(q){
+  const d=q.v;
+  let crit='sub', all=DATA.filter(x=>x.s===d.s&&x.sub===d.sub&&x.t!==d.t);
+  if(all.length<2){crit='sector';all=DATA.filter(x=>x.s===d.s&&x.t!==d.t);}
+  const correct=pick(all,Math.min(3,all.length));
+  let dis=[];
+  if(crit==='sub') dis=pick(DATA.filter(x=>x.s===d.s&&x.sub!==d.sub&&x.t!==d.t),2);
+  dis=dis.concat(pick(DATA.filter(x=>x.s!==d.s),8-correct.length-dis.length));
+  const cells=shuffle([...correct,...dis]);
+  st.peers={cells,correct:new Set(correct.map(x=>x.t)),sel:new Set(),crit};
+  const k=correct.length;
+  const ask=crit==='sub'?`Pick the ${k} from the same subsector`:`Pick the ${k} from the same sector`;
+  stage.innerHTML = tickerHead(d,ask) +
+    `<div class="grid peers">${cells.map((c,i)=>`<button class="ans peer" data-i="${i}" aria-pressed="false"><kbd>${i+1}</kbd><span class="nm">${esc(c.t)}</span><span class="etf">${st.showNames?esc(c.n):'&nbsp;'}</span></button>`).join('')}</div>
+     <div class="checkrow"><button class="btn" id="checkBtn">Check (Enter)</button></div><div class="fb" id="fb"></div>`;
+  stage.querySelectorAll('.ans').forEach(b=>b.onclick=()=>togglePeer(+b.dataset.i));
+  $('#checkBtn').onclick=checkPeers;
+}
+function togglePeer(i){
+  if(st.phase!=='ask')return;
+  const c=st.peers.cells[i]; if(!c)return;
+  const s=st.peers.sel; s.has(c.t)?s.delete(c.t):s.add(c.t);
+  const b=stage.querySelector(`.ans[data-i="${i}"]`); b.classList.toggle('sel',s.has(c.t)); b.setAttribute('aria-pressed',s.has(c.t));
+}
+function checkPeers(){
+  if(st.phase!=='ask')return;
+  const d=st.queue[st.i].v, P=st.peers;
+  const ok=P.sel.size===P.correct.size&&[...P.sel].every(t=>P.correct.has(t));
+  stage.querySelectorAll('.ans').forEach((b,i)=>{
+    const c=P.cells[i], isC=P.correct.has(c.t), isS=P.sel.has(c.t);
+    b.classList.remove('sel');
+    if(isC&&isS)b.classList.add('right');else if(isC)b.classList.add('missed');else if(isS)b.classList.add('wrong');
+    b.querySelector('.etf').textContent=`${c.n}, ${SK[c.s].short} / ${c.sub}`;
+    b.disabled=true;
+  });
+  $('#checkBtn').parentElement.hidden=true;
+  record(ok,[...P.sel].join(' '));mark(d.t,ok);
+  const legend=ok?'':`<div class="note">Solid green: correct picks. Dashed: peers you missed. Red: not a peer.</div>`;
+  $('#fb').innerHTML=fbHTML(d,ok,legend).replace('<div class="cont"></div>','<div class="cont">Press Enter to continue</div>');
+  revealTicker(d);
+}
+
+/* ---------- mode: name them ---------- */
+function askName(q){
+  const p=q.v;
+  st.nm={p,found:[],end:performance.now()+NAME_MS};
+  const sub=p.sub?`${SK[p.sector].name}`:`${SK[p.sector].etf}`;
+  stage.innerHTML=`<div class="prompt"><div class="ask">Name ${p.need} ${p.sub?'tickers in':'tickers in the sector'}</div>
+     <div class="tk small revealed" style="--c:${SK[p.sector].c}">${esc(p.label)}</div><div class="co">${esc(sub)}</div></div>
+    <div class="timer"><i id="tbar"></i></div>
+    <div class="namebox"><input id="nin" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Ticker" placeholder="Ticker, then Enter"><button class="btn ghost" id="reveal">Reveal (Esc)</button></div>
+    <div class="msg" id="msg"></div><div class="found" id="found"></div><div class="fb" id="fb"></div>`;
+  const inp=$('#nin'); inp.focus();
+  inp.onkeydown=e=>{
+    if(e.key==='Enter'){e.preventDefault(); if(st.phase==='ask')submitName(inp.value); else if(st.phase==='fb')next();}
+    else if(e.key==='Escape'){e.preventDefault(); if(st.phase==='ask')endName(false,'Revealed.');}
+  };
+  $('#reveal').onclick=()=>{if(st.phase==='ask')endName(false,'Revealed.');};
+  st.interval=setInterval(()=>{
+    const left=st.nm.end-performance.now(); const bar=$('#tbar');
+    if(bar) bar.style.width=Math.max(0,100*left/NAME_MS)+'%';
+    if(left<=0&&st.phase==='ask') endName(false,'Out of time.');
+  },100);
+}
+function submitName(raw){
+  const inp=$('#nin'), msg=$('#msg'), v=norm(raw), p=st.nm.p; inp.value='';
+  if(!v)return;
+  const d=TMAP[v];
+  if(!d){msg.innerHTML=`<span class="bad">${esc(raw.toUpperCase())}</span> isn't in this deck.`;return;}
+  if(p.set.includes(d.t)){
+    if(st.nm.found.includes(d.t)){msg.textContent=`Already have ${d.t}.`;return;}
+    st.nm.found.push(d.t); msg.innerHTML=`<span class="ok">${esc(d.t)}</span> ${esc(d.n)}`;
+    $('#found').innerHTML=st.nm.found.map(t=>`<span class="pill got">${esc(t)}</span>`).join('');
+    if(st.nm.found.length>=p.need) endName(true,'Got them.');
+  } else {
+    msg.innerHTML=`<span class="bad">${esc(d.t)}</span> is ${esc(SK[d.s].short)} / ${esc(d.sub)}.`;
+  }
+}
+function endName(ok,why){
+  clearTimers();
+  const p=st.nm.p;
+  record(ok,st.nm.found.join(' '));
+  $('#found').innerHTML=p.set.map(t=>{const d=TMAP[norm(t)];return `<span class="pill ${st.nm.found.includes(t)?'got':''}">${esc(t)}<span>${esc(d.n)}</span></span>`;}).join('');
+  $('#fb').innerHTML=`<div class="line"><span class="${ok?'ok':'bad'}">${why}</span> Everything in ${esc(p.label)} is shown above.</div><div class="cont">Press Enter to continue</div>`;
+  const inp=$('#nin'); inp.placeholder='Enter for next'; inp.focus();
+  $('#reveal').hidden=true;
+}
+
+/* ---------- summary ---------- */
+function finish(){
+  clearTimers(); st.phase='done';
+  const first=st.results.filter(r=>r.q.re===0), fOk=first.filter(r=>r.ok).length;
+  const oks=st.results.filter(r=>r.ok), avg=oks.length?oks.reduce((a,x)=>a+x.ms,0)/oks.length:null;
+  const missMap=new Map();
+  for(const r of st.results) if(!r.ok){const key=st.mode==='name'?r.q.v.label+r.q.v.sector:r.q.v.t; if(!missMap.has(key))missMap.set(key,r.q.v);}
+  const misses=[...missMap.values()];
+  const list=misses.map(v=>{
+    if(st.mode==='name') return `<li><span class="t">${esc(v.label)}</span><span>${v.set.map(esc).join(', ')}</span></li>`;
+    const s=SK[v.s]; return `<li style="--c:${s.c}"><span class="t">${esc(v.t)}</span><span>${esc(v.n)}</span><span><i class="dot"></i>${esc(s.short)} / ${esc(v.sub)}</span></li>`;
+  }).join('');
+  stage.innerHTML=`<div class="summary"><h2>${misses.length?'Session done':'Clean session'}</h2>
+    <div class="sumnums"><div><b>${first.length?Math.round(100*fOk/first.length):0}%</b>first-try accuracy</div><div><b>${fmtMs(avg)}</b>avg correct answer</div><div><b>${st.best}</b>best streak</div></div>
+    ${misses.length?`<h3>Missed (${misses.length})</h3><ul class="misslist">${list}</ul>`:'<p>No misses. Try a longer session or a harder mode.</p>'}
+    <div class="btnrow">${misses.length?'<button class="btn" id="redo">Redo misses</button>':''}<button class="btn ${misses.length?'ghost':''}" id="again">New session (Enter)</button></div></div>`;
+  const r=$('#redo'); if(r) r.onclick=()=>start(misses);
+  $('#again').onclick=()=>start();
+  updStats();
+}
+
+/* ---------- keyboard ---------- */
+document.addEventListener('keydown',e=>{
+  if(st.view!=='drill'||e.metaKey||e.ctrlKey||e.altKey)return;
+  if(e.target.tagName==='INPUT'&&e.target.type!=='checkbox')return;
+  const k=e.key;
+  if(st.phase==='idle'||st.phase==='done'){if(k==='Enter'){e.preventDefault();start();}return;}
+  if(st.phase==='fb'){if(k==='Enter'||k===' '){e.preventDefault();next();}return;}
+  if(st.phase!=='ask')return;
+  if(st.mode==='sector'){const i=HOTKEYS.indexOf(k);if(i>=0){e.preventDefault();answerSector(SECTORS[i].k);}}
+  else if(st.mode==='sub'){if(/^[1-4]$/.test(k)){e.preventDefault();answerSub(+k-1);}}
+  else if(st.mode==='peers'){if(/^[1-8]$/.test(k)){e.preventDefault();togglePeer(+k-1);}else if(k==='Enter'){e.preventDefault();checkPeers();}}
+});
+
+/* ---------- study map ---------- */
+function renderMap(){
+  const themes={};
+  DATA.forEach(d=>d.themes.forEach(t=>(themes[t]=themes[t]||[]).push(d)));
+  const secs=SECTORS.map(s=>{
+    const inS=DATA.filter(d=>d.s===s.k);
+    const subs=[...new Set(inS.map(d=>d.sub))];
+    return `<section class="sec" style="--c:${s.c}"><h2>${s.name}<span class="etf">${s.etf}</span></h2><div class="subgrid">${
+      subs.map(sub=>`<div class="sub"><h3>${esc(sub)}</h3>${inS.filter(d=>d.sub===sub).map(d=>{
+        const p=prog[d.t];
+        return `<div class="co-row"><span class="t ${d.note?'':''}">${esc(d.t)}</span><span class="n ${d.note&&/not |but |despite|Moved/.test(d.note)?'gotcha':''}">${esc(d.n)}</span>${p&&p.miss?`<span class="miss">missed ${p.miss}</span>`:''}${d.note?`<span class="note">${esc(d.note)}</span>`:''}</div>`;
+      }).join('')}</div>`).join('')
+    }</div></section>`;
+  }).join('');
+  const th=Object.entries(themes).map(([t,ds])=>`<dt>${esc(t)}</dt><dd>${ds.map(d=>`${esc(d.t)} <span style="color:${SK[d.s].c}">(${SK[d.s].short})</span>`).join(', ')}</dd>`).join('');
+  const missed=Object.values(prog).filter(p=>p.miss).length;
+  $('#mapView').innerHTML=`<div class="maptools"><span>Underlined names are classification traps. Red counts are your saved misses (${missed} names).</span><button class="linkbtn" id="resetProg">Reset saved misses</button></div>
+    <div class="map">${secs}<section class="themes"><h2>Themes that cut across sectors</h2><p>Momentum often moves by theme rather than by official sector. When one name in a theme runs, check the others.</p><dl>${th}</dl></section></div>`;
+  $('#resetProg').onclick=()=>{if(confirm('Clear saved miss history?')){prog={};saveProg();renderMap();}};
+}
+
+renderControls();idle();
+</script>
+</body>
+</html>
